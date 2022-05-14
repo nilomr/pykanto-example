@@ -2,12 +2,9 @@
 import os
 from pathlib import Path
 import sys
-import time
-import git
 from pykanto.utils.paths import ProjDirs
 from pykanto.parameters import Parameters
 from pykanto.dataset import KantoData
-from pykanto.utils.write import make_tarfile
 import ray
 
 
