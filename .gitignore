@@ -95,6 +95,7 @@ pykanto/data/datasets
 !pykanto/data/segmented/great_tit
 pykanto/data/segmented/*
 /logs/
+/data
 
 
 # general file extensions
