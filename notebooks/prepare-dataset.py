@@ -1,8 +1,13 @@
-from pathlib import Path
+import os
 import sys
+from pathlib import Path
+
 import git
 import ray
-
+from pykanto.dataset import KantoData
+from pykanto.parameters import Parameters
+from pykanto.utils.paths import ProjDirs, link_project_data
+from pykanto.utils.read import load_dataset
 
 redis_password = sys.argv[1]
 ray.init(address=os.environ["ip_head"], _redis_password=redis_password)
@@ -15,11 +20,15 @@ PROJECT_ROOT = Path(
 
 "/data/zool-songbird/shil5293/data/wytham-great-tit/segmented/greti_2021"
 
-DATA_LOCATION = Path("/media/nilomr/My Passport/SONGDATA")
-link_project_data(DATA_LOCATION, PROJECT_ROOT / "data")
-DATASET_ID = "GRETI_2021"
 
-RAW_DATA = PROJECT_ROOT / "data" / "raw" / "wytham-great-tit" / DATASET_ID
+DATASET_ID = "GRETI_2021"
+# RAW_DATA = PROJECT_ROOT / "data" / "raw" / "wytham-great-tit" / DATASET_ID
+
+
+RAW_DATA = Path(
+    "/data/zool-songbird/shil5293/data/wytham-great-tit/segmented/greti_2021"
+)
+
 DIRS = ProjDirs(PROJECT_ROOT, RAW_DATA, mkdir=True)
 
 
@@ -67,3 +76,5 @@ dataset.segment_into_units()
 dataset.get_units()
 dataset.cluster_ids(min_sample=15)
 dataset.prepare_interactive_data()
+
+dataset.to_csv(dataset.DIRS.DATASET.parent)
