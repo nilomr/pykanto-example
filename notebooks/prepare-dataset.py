@@ -22,8 +22,8 @@ DATASET_ID = "GRETI_2021"
 PROJECT_ROOT = Path(
     git.Repo(".", search_parent_directories=True).working_tree_dir
 )
-RAW_DATA = Path(
-    "/data/zool-songbird/shil5293/data/wytham-great-tit/segmented"
+RAW_DATA = (
+    Path("/data/zool-songbird/shil5293/data/wytham-great-tit/segmented")
     / DATASET_ID.lower()
 )
 DIRS = ProjDirs(PROJECT_ROOT, RAW_DATA, mkdir=True)
