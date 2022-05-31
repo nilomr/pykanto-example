@@ -5,25 +5,30 @@ from pykanto.utils.paths import ProjDirs
 from pykanto.utils.paths import get_file_paths, get_wavs_w_annotation
 from pykanto.utils.custom import parse_sonic_visualiser_xml
 from pykanto.signal.segment import segment_files_parallel
+from pykanto.utils.write import make_tarfile
 
+# Dataset to segment
+DATASET_ID = "GRETI_2020"
+
+# Where are the project and its data?
 PROJECT_ROOT = Path(
     git.Repo(".", search_parent_directories=True).working_tree_dir
 )
+DATA_LOCATION = Path("/media/nilomr/SONGDATA/wytham-great-tit")
 
-DATA_LOCATION = Path("/media/nilomr/My Passport/SONGDATA")
+# Create symlink from project to data if it doesn't exist already:
 link_project_data(DATA_LOCATION, PROJECT_ROOT / "data")
-DATASET_ID = "GRETI_2021"
 
-RAW_DATA = PROJECT_ROOT / "data" / "raw" / "wytham-great-tit" / DATASET_ID
+# Create a ProjDirs object for the project, including location of raw data to
+# segment
+RAW_DATA = PROJECT_ROOT / "data" / "wytham-great-tit" / "raw" / DATASET_ID
 DIRS = ProjDirs(PROJECT_ROOT, RAW_DATA, mkdir=True)
 
-
+# Find files and annotations and segment
 wav_filepaths, xml_filepaths = [
     get_file_paths(DIRS.RAW_DATA, [ext]) for ext in [".WAV", ".xml"]
 ]
-
 files_to_segment = get_wavs_w_annotation(wav_filepaths, xml_filepaths)
-
 segment_files_parallel(
     files_to_segment,
     DIRS,
@@ -35,9 +40,7 @@ segment_files_parallel(
     labels_to_ignore=["NOISE", "FIRST"],
 )
 
-
-from pykanto.utils.write import make_tarfile
-
-out_dir = DIRS.SEGMENTED / "JSON.tar.gz"
-in_dir = DIRS.SEGMENTED / "JSON"
+# Compress segmented folder annotations to upload to cluster
+out_dir = DIRS.SEGMENTED.parent / f"{DIRS.SEGMENTED.name}.tar.gz"
+in_dir = DIRS.SEGMENTED
 make_tarfile(in_dir, out_dir)

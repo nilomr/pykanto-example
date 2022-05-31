@@ -6,29 +6,26 @@ import git
 import ray
 from pykanto.dataset import KantoData
 from pykanto.parameters import Parameters
-from pykanto.utils.paths import ProjDirs, link_project_data
+from pykanto.utils.paths import ProjDirs
 from pykanto.utils.read import load_dataset
 
+# Ray settings
 redis_password = sys.argv[1]
 ray.init(address=os.environ["ip_head"], _redis_password=redis_password)
 print(ray.cluster_resources())
 
+# Dataset to create
+DATASET_ID = "GRETI_2021"
 
+# Create a ProjDirs object for the project, including location of raw data to
+# segment
 PROJECT_ROOT = Path(
     git.Repo(".", search_parent_directories=True).working_tree_dir
 )
-
-"/data/zool-songbird/shil5293/data/wytham-great-tit/segmented/greti_2021"
-
-
-DATASET_ID = "GRETI_2021"
-# RAW_DATA = PROJECT_ROOT / "data" / "raw" / "wytham-great-tit" / DATASET_ID
-
-
 RAW_DATA = Path(
-    "/data/zool-songbird/shil5293/data/wytham-great-tit/segmented/greti_2021"
+    "/data/zool-songbird/shil5293/data/wytham-great-tit/segmented"
+    / DATASET_ID.lower()
 )
-
 DIRS = ProjDirs(PROJECT_ROOT, RAW_DATA, mkdir=True)
 
 
@@ -43,7 +40,7 @@ params = Parameters(
     top_dB=65,  # top dB to keep
     lowcut=2000,
     highcut=10000,
-    # Segmentation,
+    # Segmentation
     max_dB=-30,  # Max threshold for segmentation
     dB_delta=5,  # n thresholding steps, in dB
     silence_threshold=0.1,  # Between 0.1 and 0.3 tends to work
@@ -55,7 +52,6 @@ params = Parameters(
     song_level=True,
     subset=None,
     verbose=False,
-    num_cpus=None,
 )
 # np.random.seed(123)
 # random.seed(123)
