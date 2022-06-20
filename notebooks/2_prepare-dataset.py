@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import git
 import ray
@@ -18,6 +18,7 @@ from pykanto.utils.read import load_dataset
 
 
 def main(
+    arg1: Optional[Any] = typer.Option(None),
     redis_password: Optional[str] = typer.Option(None),
     dataset_id: str = typer.Option(
         ...,
