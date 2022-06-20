@@ -1,3 +1,7 @@
+# ──── IMPORTS ──────────────────────────────────────────────────────────────────
+
+from __future__ import annotations
+
 from pathlib import Path
 
 import git
@@ -11,6 +15,8 @@ from pykanto.utils.paths import (
 )
 from pykanto.utils.write import make_tarfile
 
+# ──── SETTINGS ─────────────────────────────────────────────────────────────────
+
 # Dataset to segment
 DATASET_ID = "GRETI_2020"
 
@@ -18,7 +24,8 @@ DATASET_ID = "GRETI_2020"
 PROJECT_ROOT = Path(
     git.Repo(".", search_parent_directories=True).working_tree_dir
 )
-DATA_LOCATION = Path("/media/nilomr/SONGDATA/wytham-great-tit")
+# DATA_LOCATION = Path("/media/nilomr/SONGDATA/wytham-great-tit")
+DATA_LOCATION = Path("/media/nilomr/My Passport/SONGDATA/wytham-great-tit")
 
 # Create symlink from project to data if it doesn't exist already:
 link_project_data(DATA_LOCATION, PROJECT_ROOT / "data")
@@ -27,6 +34,8 @@ link_project_data(DATA_LOCATION, PROJECT_ROOT / "data")
 # segment
 RAW_DATA = PROJECT_ROOT / "data" / "wytham-great-tit" / "raw" / DATASET_ID
 DIRS = ProjDirs(PROJECT_ROOT, RAW_DATA, DATASET_ID, mkdir=True)
+
+# ──── SEGMENT FILES ────────────────────────────────────────────────────────────
 
 # Find files and annotations and segment
 wav_filepaths, xml_filepaths = [
