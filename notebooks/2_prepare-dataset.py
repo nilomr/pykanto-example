@@ -17,15 +17,22 @@ from pykanto.utils.read import load_dataset
 
 
 def main(
-    dataset_id: str = typer.Argument(
-        ..., help="Name of the dataset to be created"
-    ),
-    segmented_folder: str = typer.Argument(
+    dataset_id: str = typer.Option(
         ...,
+        "--dataset-id",
+        "-d",
+        help="Name of the dataset to be created",
+        prompt=True,
+    ),
+    data_folder: str = typer.Option(
+        ...,
+        "--data-folder",
+        "-f",
         help=(
             "Name of the folder containing the segmented data, "
             "assumed to be under ` project_root / 'data' / 'segmented' `"
         ),
+        prompt=True,
     ),
 ):
     typer.echo(f"Chosen dataset name: {dataset_id}")
@@ -41,7 +48,7 @@ def main(
     project_root = Path(
         git.Repo(".", search_parent_directories=True).working_tree_dir
     )
-    segmented_dir = project_root / "data" / "segmented" / segmented_folder
+    segmented_dir = project_root / "data" / "segmented" / data_folder
     DIRS = ProjDirs(project_root, segmented_dir, dataset_id, mkdir=True)
 
     # Define parameters
