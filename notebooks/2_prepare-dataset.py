@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 import git
 import ray
@@ -17,12 +18,12 @@ from pykanto.utils.read import load_dataset
 
 
 def main(
+    redis_password: Optional[str] = typer.Option(None),
     dataset_id: str = typer.Option(
         ...,
         "--dataset-id",
         "-d",
         help="Name of the dataset to be created",
-        prompt=True,
     ),
     data_folder: str = typer.Option(
         ...,
@@ -32,14 +33,12 @@ def main(
             "Name of the folder containing the segmented data, "
             "assumed to be under ` project_root / 'data' / 'segmented' `"
         ),
-        prompt=True,
     ),
 ):
     typer.echo(f"Chosen dataset name: {dataset_id}")
 
     # Ray settings
     if "ip_head" in os.environ:
-        redis_password = sys.argv[1]
         ray.init(address=os.environ["ip_head"], _redis_password=redis_password)
         print(ray.cluster_resources())
 
