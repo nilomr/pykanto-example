@@ -16,10 +16,13 @@ from pykanto.utils.read import load_dataset
 
 # ──── SETTINGS ─────────────────────────────────────────────────────────────────
 
+app = typer.Typer()
 
+
+@app.command(
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
 def main(
-    ip_head: Optional[str] = typer.Option(None),
-    redis_password: Optional[str] = typer.Option(None),
     dataset_id: str = typer.Option(
         ...,
         "--dataset-id",
@@ -99,4 +102,4 @@ def main(
 
 
 if __name__ == "__main__":
-    typer.run(main)
+    app()
