@@ -43,6 +43,7 @@ def main(
 
     # Ray settings
     if "ip_head" in os.environ:
+        redis_password = sys.argv[1]
         ray.init(address=os.environ["ip_head"], _redis_password=redis_password)
         print(ray.cluster_resources())
 
