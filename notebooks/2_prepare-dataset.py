@@ -18,7 +18,7 @@ from pykanto.utils.read import load_dataset
 
 
 def main(
-    arg1: Optional[Any] = typer.Option(None),
+    ip_head: Optional[str] = typer.Option(None),
     redis_password: Optional[str] = typer.Option(None),
     dataset_id: str = typer.Option(
         ...,
