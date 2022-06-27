@@ -53,7 +53,7 @@ segment_files_parallel(
     labels_to_ignore=["NOISE", "FIRST"],
 )
 
-# Compress segmented folder annotations to upload to cluster
+# Compress segmented folder annotations to upload via scp
 out_dir = DIRS.SEGMENTED.parent / f"{DIRS.SEGMENTED.name}.tar.gz"
 in_dir = DIRS.SEGMENTED
 make_tarfile(in_dir, out_dir)
