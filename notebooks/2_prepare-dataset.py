@@ -11,8 +11,8 @@ import ray
 import typer
 from pykanto.dataset import KantoData
 from pykanto.parameters import Parameters
+from pykanto.utils.io import load_dataset
 from pykanto.utils.paths import ProjDirs
-from pykanto.utils.read import load_dataset
 
 # ──── SETTINGS ─────────────────────────────────────────────────────────────────
 
