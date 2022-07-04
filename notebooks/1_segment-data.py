@@ -7,13 +7,13 @@ from pathlib import Path
 import git
 from pykanto.signal.segment import segment_files_parallel
 from pykanto.utils.custom import parse_sonic_visualiser_xml
+from pykanto.utils.io import make_tarfile
 from pykanto.utils.paths import (
     ProjDirs,
     get_file_paths,
     get_wavs_w_annotation,
     link_project_data,
 )
-from pykanto.utils.write import make_tarfile
 
 # ──── SETTINGS ─────────────────────────────────────────────────────────────────
 
