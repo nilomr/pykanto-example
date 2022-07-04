@@ -26,8 +26,8 @@ from pykanto.signal.analysis import (
 from pykanto.signal.filter import mels_to_hzs
 from pykanto.signal.spectrogram import retrieve_spectrogram
 from pykanto.utils.compute import with_pbar
+from pykanto.utils.io import load_dataset
 from pykanto.utils.paths import ProjDirs, link_project_data
-from pykanto.utils.read import load_dataset
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.manifold import MDS
 from sklearn.metrics import (
