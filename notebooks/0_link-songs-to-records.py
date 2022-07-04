@@ -10,6 +10,7 @@ attempt in a nest box at which we tried to record songs.
 from __future__ import annotations
 
 import json
+import warnings
 from datetime import datetime as dt
 from pathlib import Path
 
@@ -52,8 +53,9 @@ DIRS = ProjDirs(PROJECT_ROOT, RAW_DATA, DATASET_ID, mkdir=True)
 brood_path = [
     file
     for file in (DIRS.RESOURCES / "bird_data").glob("*.csv")
-    if DATASET_ID.split("_")[1] in str(file)
+    if f"ebmp_broods_{DATASET_ID.split('_')[1]}" in str(file)
 ][0]
+
 
 broods = pd.read_csv(brood_path)
 broods.columns = broods.columns.str.lower().str.replace(" ", "_")
@@ -90,40 +92,42 @@ broods["clear_date"] = broods.clear_date.fillna(broods["clear_date"].max())
 # rename the folders from their simple names to their 'Pnum', which includes the
 # year and the breeding attempt.
 
-extension = ".WAV"
-olddirs = [f for f in DIRS.RAW_DATA.iterdir() if f.is_dir()]
+if "segmented" not in str(DIRS.RAW_DATA):
+    extension = ".WAV"
+    olddirs = [f for f in DIRS.RAW_DATA.iterdir() if f.is_dir()]
 
-d = {}
-for box in olddirs:
-    box.stem
-    fs = list(box.glob(f"*{extension}"))
-    fs.sort()
-    f, l = fs[0].stem, fs[-1].stem
+    d = {}
+    for box in olddirs:
+        box.stem
+        fs = list(box.glob(f"*{extension}"))
+        fs.sort()
+        f, l = fs[0].stem, fs[-1].stem
 
-    d[box.stem] = {
-        k: dt.strptime(datime, "%Y%m%d_%H%M%S")
-        for k, datime in zip(["first", "last"], [f, l])
-    }
+        d[box.stem] = {
+            k: dt.strptime(datime, "%Y%m%d_%H%M%S")
+            for k, datime in zip(["first", "last"], [f, l])
+        }
 
-# Works with box code or pnum
-d = {(k if len(k) < 5 else k[5:]): v for k, v in d.items()}
+    # Works with box code or pnum
+    d = {(k if len(k) < 5 else k[5:]): v for k, v in d.items()}
 
-d_pnum = {}
-for box, dates in d.items():
-    boxes = broods.query("box == @box").copy()
-    if len(boxes) > 1:
-        boxes.sort_values("clear_date", inplace=True)
-        k = 0
-        while boxes.at[boxes.index[k], "clear_date"] < dates["last"]:
-            k += 1
-        pnum = boxes.at[boxes.index[k], "pnum"]
-    else:
-        pnum = boxes["pnum"].values[0]
-    d_pnum[box] = pnum
+    d_pnum = {}
+    for box, dates in d.items():
+        boxes = broods.query("box == @box").copy()
+        if len(boxes) > 1:
+            boxes.sort_values("clear_date", inplace=True)
+            k = 0
+            while boxes.at[boxes.index[k], "clear_date"] < dates["last"]:
+                k += 1
+            pnum = boxes.at[boxes.index[k], "pnum"]
+        else:
+            pnum = boxes["pnum"].values[0]
+        d_pnum[box] = pnum
 
-if len(olddirs) != len(d_pnum):
-    raise IndexError("Number of boxes does not match number of pnums")
-
+    if len(olddirs) != len(d_pnum):
+        raise IndexError("Number of boxes does not match number of pnums")
+else:
+    warnings.warn("Can only rename folders in /raw directory")
 
 # Rename raw data folders
 # WARNING - proceed with caution!
@@ -133,7 +137,7 @@ if "segmented" not in str(DIRS.RAW_DATA):
             newdir = DIRS.RAW_DATA / d_pnum[olddir.stem]
             olddir.rename(newdir)
 else:
-    raise NotImplementedError("Can only rename folders in /raw directory")
+    warnings.warn("Can only rename folders in /raw directory")
 
 
 # Rename existing segmented WAV and JSON files
