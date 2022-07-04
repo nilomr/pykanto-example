@@ -9,6 +9,7 @@ attempt in a nest box at which we tried to record songs.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime as dt
 from pathlib import Path
 
@@ -16,7 +17,12 @@ import git
 import numpy as np
 import pandas as pd
 from pykanto.utils.compute import with_pbar
-from pykanto.utils.paths import ProjDirs, link_project_data
+from pykanto.utils.paths import (
+    ProjDirs,
+    get_file_paths,
+    get_wavs_w_annotation,
+    link_project_data,
+)
 
 # ──── SETTINGS ─────────────────────────────────────────────────────────────────
 
@@ -29,6 +35,8 @@ PROJECT_ROOT = Path(
 )
 # DATA_LOCATION = Path("/media/nilomr/SONGDATA/wytham-great-tit")
 DATA_LOCATION = Path("/media/nilomr/My Passport/SONGDATA/wytham-great-tit")
+# DATA_LOCATION = Path("/data/zool-songbird/shil5293/data/wytham-great-tit")
+
 
 # Create symlink from project to data if it doesn't exist already:
 link_project_data(DATA_LOCATION, PROJECT_ROOT / "data")
@@ -116,11 +124,45 @@ for box, dates in d.items():
 if len(olddirs) != len(d_pnum):
     raise IndexError("Number of boxes does not match number of pnums")
 
+
 # Rename raw data folders
-# WARNING - proceed with caution
-for olddir, pnum in with_pbar(zip(olddirs, d_pnum.values()), total=len(d_pnum)):
-    newdir = DIRS.RAW_DATA / f"{pnum}"
-    olddir.rename(newdir)
+# WARNING - proceed with caution!
+if "segmented" not in str(DIRS.RAW_DATA):
+    for olddir in with_pbar(olddirs, total=len(olddirs)):
+        if olddir.stem in d_pnum:
+            newdir = DIRS.RAW_DATA / d_pnum[olddir.stem]
+            olddir.rename(newdir)
+else:
+    raise NotImplementedError("Can only rename folders in /raw directory")
+
+
+# Rename existing segmented WAV and JSON files
+wav_filepaths, json_filepaths = [
+    get_file_paths(DIRS.SEGMENTED / ext.upper(), [f".{ext}"])
+    for ext in ["wav", "JSON"]
+]
+
+# Update dictionary values
+for f in with_pbar(json_filepaths):
+    s = f.stem.split("_")[0]
+    box = s[5:] if len(s) > 5 else s
+    pnum = d_pnum[box]
+    with open(f, "r") as fp:
+        data = json.load(fp)
+    for k, v in data.items():
+        if isinstance(v, str) and pnum not in v:
+            data[k] = v.replace(box, pnum)
+    with open(f.as_posix(), "w") as fp:
+        print(json.dumps(data, indent=2), file=fp)
+
+# Rename wav and json files
+all_paths = [*wav_filepaths, *json_filepaths]
+for olddir in with_pbar(all_paths):
+    box = olddir.stem.split("_")[0]
+    if box in d_pnum:
+        pnum = d_pnum[box]
+        newdir = olddir.parent / olddir.name.replace(box, pnum)
+        olddir.rename(newdir)
 
 
 # ──── GET RINGING DATA ─────────────────────────────────────────────────────────
