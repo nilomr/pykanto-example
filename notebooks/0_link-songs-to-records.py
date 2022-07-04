@@ -77,10 +77,10 @@ broods["clear_date"] = broods.clear_date.fillna(broods["clear_date"].max())
 # ──── ASSIGN RECORDIGNS TO BREEDING ATTEMPTS ───────────────────────────────────
 
 # Every year songs recorded at a nest are saved to a `year/boxnumber` folder.
-# Once all the breeding data is in, we can link the nestboxes with any records
-# available for it. To make it easier to later combine data from multiple years,
-# we will rename the folders from their simple names to their 'Pnum', which
-# includes the year and the breeding attempt.
+# Once all the breeding data are in, we can link the nestboxes with their
+# records. To make it easier to later combine data from multiple years, we will
+# rename the folders from their simple names to their 'Pnum', which includes the
+# year and the breeding attempt.
 
 extension = ".WAV"
 olddirs = [f for f in DIRS.RAW_DATA.iterdir() if f.is_dir()]
@@ -189,4 +189,13 @@ broods.sort_values("pnum", inplace=True)
 broods.to_csv(
     DIRS.RESOURCES / "bird_data" / f"bird_data_{DATASET_ID.split('_')[1]}.csv",
     index=False,
+)
+
+# Print some information:
+print(f"{len(broods)} rows in dataset")
+# Print proportion of broods that have IDs / were born in whytham:
+print(f"{len(broods[broods['father'].notna()])} birds have ID")
+print(
+    f"Out of those {len(broods.query('wytham_born == True'))} "
+    "were born in the population"
 )
