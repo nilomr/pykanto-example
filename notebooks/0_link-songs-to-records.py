@@ -35,8 +35,8 @@ PROJECT_ROOT = Path(
     git.Repo(".", search_parent_directories=True).working_tree_dir
 )
 # DATA_LOCATION = Path("/media/nilomr/SONGDATA/wytham-great-tit")
-DATA_LOCATION = Path("/media/nilomr/My Passport/SONGDATA/wytham-great-tit")
-# DATA_LOCATION = Path("/data/zool-songbird/shil5293/data/wytham-great-tit")
+# DATA_LOCATION = Path("/media/nilomr/My Passport/SONGDATA/wytham-great-tit")
+DATA_LOCATION = Path("/data/zool-songbird/shil5293/data/wytham-great-tit")
 
 
 # Create symlink from project to data if it doesn't exist already:
@@ -44,7 +44,7 @@ link_project_data(DATA_LOCATION, PROJECT_ROOT / "data")
 
 # Create a ProjDirs object for the project, including location of raw data to
 # segment
-RAW_DATA = PROJECT_ROOT / "data" / "raw" / DATASET_ID
+RAW_DATA = PROJECT_ROOT / "data" / "segmented" / DATASET_ID.lower()
 DIRS = ProjDirs(PROJECT_ROOT, RAW_DATA, DATASET_ID, mkdir=True)
 
 # ──── MAIN ─────────────────────────────────────────────────────────────────────
