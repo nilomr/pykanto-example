@@ -38,14 +38,18 @@ PROJECT_ROOT = Path(
 # DATA_LOCATION = Path("/media/nilomr/My Passport/SONGDATA/wytham-great-tit")
 DATA_LOCATION = Path("/data/zool-songbird/shil5293/data/wytham-great-tit")
 
-
 # Create symlink from project to data if it doesn't exist already:
 link_project_data(DATA_LOCATION, PROJECT_ROOT / "data")
 
 # Create a ProjDirs object for the project, including location of raw data to
-# segment
+# segment or the already-segmented data
 RAW_DATA = PROJECT_ROOT / "data" / "segmented" / DATASET_ID.lower()
 DIRS = ProjDirs(PROJECT_ROOT, RAW_DATA, DATASET_ID, mkdir=True)
+
+# Where to save the data file?
+bird_data_outdir = (
+    DIRS.RESOURCES / "bird_data" / f"bird_data_{DATASET_ID.split('_')[1]}.csv"
+)
 
 # ──── MAIN ─────────────────────────────────────────────────────────────────────
 
@@ -55,7 +59,6 @@ brood_path = [
     for file in (DIRS.RESOURCES / "bird_data").glob("*.csv")
     if f"ebmp_broods_{DATASET_ID.split('_')[1]}" in str(file)
 ][0]
-
 
 broods = pd.read_csv(brood_path)
 broods.columns = broods.columns.str.lower().str.replace(" ", "_")
@@ -126,8 +129,16 @@ if "segmented" not in str(DIRS.RAW_DATA):
 
     if len(olddirs) != len(d_pnum):
         raise IndexError("Number of boxes does not match number of pnums")
-else:
-    warnings.warn("Can only rename folders in /raw directory")
+elif "segmented" in str(DIRS.RAW_DATA):
+    warnings.warn(
+        "Can only use data in /raw directory to get pnums. You need to get "
+        "the pnums from the raw data or provide a file with pnums obtained "
+        "from the raw data."
+    )
+    # Get boxes from segmented data instead
+    d = dict(pd.read_csv(bird_data_outdir)[["pnum", "box"]].values)
+    d = {v: k for k, v in d.items()}
+
 
 # Rename raw data folders
 # WARNING - proceed with caution!
@@ -138,7 +149,6 @@ if "segmented" not in str(DIRS.RAW_DATA):
             olddir.rename(newdir)
 else:
     warnings.warn("Can only rename folders in /raw directory")
-
 
 # Rename existing segmented WAV and JSON files
 wav_filepaths, json_filepaths = [
@@ -233,7 +243,7 @@ broods = broods.merge(coords).drop_duplicates(subset=["pnum"])
 broods.drop(columns=["clear_date", "species"], inplace=True)
 broods.sort_values("pnum", inplace=True)
 broods.to_csv(
-    DIRS.RESOURCES / "bird_data" / f"bird_data_{DATASET_ID.split('_')[1]}.csv",
+    bird_data_outdir,
     index=False,
 )
 
