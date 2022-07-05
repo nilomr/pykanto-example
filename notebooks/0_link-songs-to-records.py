@@ -235,6 +235,12 @@ coords = pd.read_csv(coord_file).drop("section", axis=1)
 coords.box = coords.box.str.upper()
 broods = broods.merge(coords).drop_duplicates(subset=["pnum"])
 
+# Add whether it was recorded:
+broods.loc[:, "recorded"] = [
+    True if b in d_pnum.values() else False for b in broods["pnum"].values
+]
+
+
 # ──── SAVE DERIVED DATASET ─────────────────────────────────────────────────────
 
 # Remove unwanted columns and save
