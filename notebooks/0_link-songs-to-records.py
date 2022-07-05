@@ -131,13 +131,11 @@ if "segmented" not in str(DIRS.RAW_DATA):
         raise IndexError("Number of boxes does not match number of pnums")
 elif "segmented" in str(DIRS.RAW_DATA):
     warnings.warn(
-        "Can only use data in /raw directory to get pnums. You need to get "
-        "the pnums from the raw data or provide a file with pnums obtained "
-        "from the raw data."
+        "Trying to read existing pnums from file (raw data folder missing)"
     )
-    # Get boxes from segmented data instead
     d = dict(pd.read_csv(bird_data_outdir)[["pnum", "box"]].values)
-    d = {v: k for k, v in d.items()}
+    d_pnum = {v: k for k, v in d.items()}
+    print(f"Found {len(d_pnum)} pnums")
 
 
 # Rename raw data folders
