@@ -43,9 +43,10 @@ def main(
 
     # Ray settings
     if "ip_head" in os.environ:
+        typer.echo("ip_head in os.environ")
         redis_password = sys.argv[1]
         ray.init(address=os.environ["ip_head"], _redis_password=redis_password)
-        print(ray.cluster_resources())
+        typer.echo(ray.cluster_resources())
 
     # Create a ProjDirs object for the project, including location of raw data to
     # use
@@ -88,7 +89,7 @@ def main(
         DIRS,
         parameters=params,
         overwrite_dataset=True,
-        random_subset=10,
+        random_subset=None,
         overwrite_data=True,
     )
 

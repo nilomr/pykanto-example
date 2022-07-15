@@ -28,7 +28,7 @@ from pykanto.utils.paths import (
 # ──── SETTINGS ─────────────────────────────────────────────────────────────────
 
 # Dataset to segment
-DATASET_ID = "GRETI_2021"
+DATASET_ID = "GRETI_2020"
 
 # Where are the project and its data?
 PROJECT_ROOT = Path(
