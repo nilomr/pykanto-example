@@ -97,6 +97,8 @@ pykanto/data/segmented/*
 /logs/
 /data
 
+# Pytorch/neptune
+*/.neptune
 
 # general file extensions
 *.doc
