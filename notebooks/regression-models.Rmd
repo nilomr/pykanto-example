@@ -51,8 +51,12 @@ for (dir in dirs) {
 
 ```{r import-data}
 data <- read_csv(file.path(dirs$resources, "bird_data", "full_dataset_2020-2021.csv"))
+dyad_data <- read_csv(file.path(dirs$resources, "bird_data", "dyad_dataset_2020-2021.csv"))
 
 data <- data %>% mutate(sharing_index = shared / total_rep)
+dyad_data <- dyad_data %>% mutate(sharing_index = shared / total_rep)
+dyad_data <- dyad_data %>%  mutate(imm_status = wytham_born_1+ wytham_born_2)
+
 # filter(sampling_effort >= 15) %>% # Birds with fewer than 15 songs were not checked
 # mutate(
 #     immigration = as.factor(as.integer(immigration == "imm")),
@@ -72,6 +76,7 @@ print(paste("The number of distinct ID'd birds is", n_distinct(data$father)))
 data %>% ggplot(aes(x = repertoire_size)) +
     geom_histogram()
 ```
+
 
 ```{r gp-test}
 
@@ -103,6 +108,11 @@ m_3_f <- brmsformula(prop_immigrants ~ 1 +
 family = gaussian()
 )
 
+# Spatial distribution of dispersal levels
+m_3.1_f <- brmsformula(mean_dispersal ~ 1 +
+    gp(x, y, k = 20, scale = TRUE, c = 5 / 4),
+family = gaussian()
+)
 
 m_4_f <- brmsformula(sharing_index ~ 1 +
     prop_immigrants * wytham_born + (1 | father) +
@@ -113,6 +123,25 @@ family = hurdle_lognormal()
 m_5_f <- brmsformula(repertoire_size ~ 1 +
     prop_immigrants + wytham_born + mean_spat_dist + year + (1 | father) +
     s(x, y),
+family = gaussian()
+)
+
+m_6_f <- brmsformula(ac_sim ~ 1 + 
+s(spatial_dist) + year_1 + (1 | mm(father_1, father_2)),
+family = hurdle_lognormal()
+)
+
+
+m_7_f <- brmsformula(ac_sim ~ 1 + 
+s(spatial_dist, by = imm_status) + year_1 + (1 | mm(father_1, father_2)),
+family = hurdle_lognormal()
+)
+
+
+m_8_f <- brmsformula(sharing_index ~ 1 +
+    prop_immigrants + dispersal_distance*mean_dispersal +
+    gp(x, y, k = 15, scale = TRUE, c = 5 / 4) +
+    (1 | father),
 family = gaussian()
 )
 
@@ -136,7 +165,7 @@ m_0 <-
         seed = 444,
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_0"),
-        file_refit = "on_change",
+        file_refit = "never",
         control = list(adapt_delta = 0.999, max_treedepth = 20)
     )
 
@@ -151,7 +180,7 @@ m_1 <-
         seed = 444,
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_1"),
-        file_refit = "on_change",
+        file_refit = "never",
         control = list(adapt_delta = 0.999, max_treedepth = 20)
     )
 
@@ -166,7 +195,7 @@ m_2 <-
         seed = 444,
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_2"),
-        file_refit = "on_change",
+        file_refit = "never",
         control = list(adapt_delta = 0.999, max_treedepth = 20)
     )
 
@@ -181,7 +210,22 @@ m_3 <-
         seed = 444,
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_3"),
-        file_refit = "on_change",
+        file_refit = "never",
+        control = list(adapt_delta = 0.999, max_treedepth = 20)
+    )
+
+m_3.1 <-
+    brm(
+        formula = m_3.1_f,
+        data = data,
+        # prior = priors,
+        iter = 2000, warmup = 500,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_3.1"),
+        file_refit = "never",
         control = list(adapt_delta = 0.999, max_treedepth = 20)
     )
 
@@ -202,7 +246,7 @@ m_4 <-
         seed = 444,
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_4"),
-        file_refit = "on_change",
+        file_refit = "never",
         control = list(adapt_delta = 0.9999, max_treedepth = 20)
     )
 
@@ -217,9 +261,42 @@ m_5 <-
         seed = 444,
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_5"),
-        file_refit = "on_change",
+        file_refit = "never",
         control = list(adapt_delta = 0.99, max_treedepth = 20)
     )
+
+
+m_6 <-
+    brm(
+        formula = m_6_f,
+        data = dyad_data,
+        # prior = priors,
+        iter = 2000, warmup = 600,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_6"),
+        file_refit = "never",
+        control = list(adapt_delta = 0.99, max_treedepth = 20)
+    )
+
+m_7 <-
+    brm(
+        formula = m_7_f,
+        data = dyad_data,
+        # prior = priors,
+        iter = 3000, warmup = 600,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_7"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.999, max_treedepth = 15)
+    )
+
+
 ```
 
 
@@ -227,10 +304,13 @@ m_5 <-
 
 pp_check(m_0, ndraws = 100)
 pp_check(m_4, ndraws = 100)
+pp_check(m_6, ndraws = 100)
+pp_check(m_7, ndraws = 100)
 
 conditional_effects(m_0, effects = "prop_immigrants")
 conditional_effects(m_4)
-conditional_effects(m_5)
+conditional_effects(m_6)
+conditional_effects(m_7)
 
 
 me_loss_prior1 <- conditional_effects(
@@ -374,6 +454,26 @@ m_5 %>%
     ) +
     theme(legend.position = "bottom")
 
+m_6 %>%
+    emmeans(~spatial_dist,
+        var = "spatial_dist",
+        at = list('spatial_dist' = seq(0, 4000, 100)),
+        epred = TRUE
+    ) %>%
+    gather_emmeans_draws() %>%
+        ggplot(aes(x = spatial_dist, y = .value)) +
+        stat_lineribbon(size = 1, color = "darkorange") +
+        scale_fill_manual(values = colorspace::lighten("darkorange", c(0.95, 0.7, 0.4))) +
+        # scale_y_continuous(labels = label_comma()) +
+        labs(
+            x = "spatial_dist", y = "Proportion shared songs",
+            subtitle = "Expected values from mu and hu parts (epred = TRUE)",
+            fill = "Credible interval"
+        ) +
+        globtheme +
+    theme(legend.position = "bottom")
+
+
 
 m_0 |>
     emmeans(~prop_immigrants,
@@ -394,6 +494,108 @@ m_0 |>
     ) +
     theme(legend.position = "bottom")
 ```
+
+
+```{r}
+# get conditional effects
+m_6_cond_effs = conditional_effects(
+  m_6,
+  effects = "spatial_dist",
+  spaghetti = T,
+  points = T,
+  ndraws = 30,
+  resolution = 20,
+  method = "fitted"
+)
+m_6_df = as.data.frame(m_6_cond_effs$spatial_dist)
+
+```
+
+## Plot similarity vs distance
+
+```{r}
+text_colour = "#f2f2f2"
+
+attr(m_6_df, "spaghetti") %>% 
+ ggplot(
+
+) +
+  geom_line(  aes(
+    x = effect1__,
+    y = estimate__,
+    group = sample__
+  ),  alpha = .2, size = .4, color = '#d1466c') +
+  geom_line(
+    # smooth jagged mean line (change to geom_line
+    # to see that it has no effect otherwise)
+    data = m_6_df,
+    aes(  x = effect1__,
+    y = estimate__,),
+        alpha = 1,
+    size = 2,
+    colour= '#fdf7b7'
+  ) +
+    theme(
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour = text_colour, fill=NA, size=1),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(colour = text_colour),
+        axis.text.y = element_text(colour = text_colour),
+        text = element_text(size = 8),
+        plot.title = element_text(size = 14, face = "bold", colour = text_colour),
+        plot.title.position = "panel",
+        plot.subtitle = element_markdown(size = 8, colour = text_colour),
+        plot.caption = element_text(size = 8, hjust = 0),
+        plot.caption.position = "plot",
+        legend.key.width = unit(0.5, "cm"),
+        legend.position = c(.9, .75),
+        legend.background = element_rect(fill = "transparent", color = NA),
+        legend.box.background = element_rect(fill = "transparent", color = NA),
+        legend.text=element_text(color=text_colour),
+        legend.title=element_text(color=text_colour),
+        panel.background = element_rect(fill = "transparent", color = NA),
+        plot.background = element_rect(fill = "transparent", color = NA)
+    ) +
+    guides(
+        size = "none",
+    ) +
+    labs(
+        x = NULL,
+        y = NULL,
+        title = "Levels of postnatal dispersal across space",
+        subtitle = "*Posterior conditional effects of spatial predictor*<br>"
+        # caption = "\nOther information"
+    ) 
+```
+```{r}
+
+spagetti_plot <- plot(
+  conditional_effects(
+    m_6,
+    effects = "spatial_dist",
+    prob = 0.89,
+    spaghetti = TRUE,
+    ndraws = 50,
+    resolution = 100,
+
+  ),
+  theme = theme_bw()
+)
+
+# You can make subsequent aesthetic tweaks by referencing the underlying ggplot2 object
+spagetti_plot_edited <- spagetti_plot$time + 
+  # Adjust the breaks along the y axis
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) +
+  # Adding Labels to the X and Y axis
+  labs(
+    y = TeX('Y | $\\alpha_{j}+\\gamma_{j}Time_{tj}\\times\\gamma_{j}Conflict_{tj}$'),
+    x = TeX("Time")
+  )
+
+```
+
 ## Plot posterior estimates of main effects
 ```{r posterior estimates}
 # Check internal variable names
@@ -460,7 +662,8 @@ ggsave(
     height = 13,
     units = "cm",
     dpi = 300,
-    limitsize = FALSE
+    limitsize = FALSE,
+    bg="transparent"
 )
 ```
 
@@ -496,33 +699,8 @@ spatial_cond_effs <- function(model,
 
     return(estimates)
 }
-```
 
-```{r }
-# Read in woodland contour (with gaps)
-epsg_code <- "epsg:27700"
-perimeter <- vect(file.path(
-    dirs$resources, "ww_contour", "wytham_perimeter.shp"
-))
-terra::crs(perimeter) <- epsg_code
 
-# Used nestbox locations
-nestbox_locs <- data %>% select(x, y)
-```
-
-```{r}
-# Get estimates and mask to contour of study site
-
-# 1. Conditional effects of Gaussian process
-
-resolution <- 300
-est <- spatial_cond_effs(
-    m_5,
-    varnames = "x:y",
-    resolution = resolution
-)
-
-# Expand borders by repeating values:
 expand_rast <- function(df, axis = 0, position = "first") {
     uniquex <- unique(if (axis == 1) df$x else df$y)
     if (position == "first") {
@@ -549,8 +727,39 @@ expand_rast <- function(df, axis = 0, position = "first") {
     return(tobind)
 }
 
-# subtract the next number from each number in the list uniquex:
+
+```
+
+```{r }
+# Read in woodland contour (with gaps)
+epsg_code <- "epsg:27700"
+perimeter <- vect(file.path(
+    dirs$resources, "ww_contour", "wytham_perimeter.shp"
+))
+terra::crs(perimeter) <- epsg_code
+
+# Used nestbox locations
+nestbox_locs <- data %>% select(x, y)
+```
+
+```{r}
+# Get estimates and mask to contour of study site
+
+# 1. Conditional effects of Gaussian process
+
+resolution <- 500
+est <- spatial_cond_effs(
+    m_3.1,
+    varnames = "x:y",
+    resolution = resolution
+)
+
+# Expand borders by repeating values:
 margins <- list()
+# ax[1, 0, 1, 0]
+# for (i in 1:4) {
+#     margins[[i]] <- expand_rast(est, axis = i, position = "first")
+# }
 margins[[1]] <- expand_rast(est, axis = 1, position = "first")
 margins[[2]] <- expand_rast(est, axis = 0, position = "first")
 margins[[3]] <- expand_rast(est, axis = 1, position = "last")
@@ -568,42 +777,51 @@ masked_rast <- rast(ex_est, type = "xyz") %>%
 
 x_max <- max(masked_rast$estimate)
 x_min <- min(masked_rast$estimate)
-colticks <- round(seq(f = x_min, t = x_max, by = .4), digits = 1)
-
+colticks <- round(seq(f = x_min, t = x_max, by = 200), digits = 0)
+text_colour = "#f2f2f2"
 ggplot() +
-    geom_sf(data = sf::st_as_sf(perimeter), color = NA, fill = "#616161") +
     geom_raster(data = masked_rast, aes(x = x, y = y, fill = estimate)) +
+    geom_sf(data = sf::st_as_sf(perimeter), fill = NA, colour = text_colour, size = 0.3) +
     # geom_point(
     #     data = data, aes(
-    #         x = x, y = y,
-    #         size = repertoire_size^2,
+    #         x = x, y = y
     #     ),
     #     pch = 21, fill = "white",
-    #     color = "#ffffff", alpha = 0.2
+    #     color = "#ffffff", alpha = 0.4, size = 0.1
     # ) +
     # scale_size_continuous(range = c(0.5, 5)) +
     scale_fill_viridis_c(
         option = "magma",
-        alpha = .8,
-        name = "Estimate\n(rep. size)",
-        breaks = colticks
+        alpha = 1,
+        name = "Estimate",
+        breaks = colticks,
+        guide = guide_colorbar(
+        ticks = FALSE, 
+        nbin = 1000
+        )
     ) +
     theme(
-        panel.background = element_blank(),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour = text_colour, fill=NA, size=1),
         axis.ticks.y = element_blank(),
         axis.ticks.x = element_blank(),
-        axis.text.x = element_text(colour = "#a3a3a3"),
-        axis.text.y = element_text(colour = "#a3a3a3"),
+        axis.text.x = element_text(colour = text_colour),
+        axis.text.y = element_text(colour = text_colour),
         text = element_text(size = 8),
-        plot.title = element_text(size = 14, face = "bold"),
-        plot.title.position = "plot",
-        plot.subtitle = element_markdown(size = 8, colour = "#363636"),
+        plot.title = element_text(size = 14, face = "bold", colour = text_colour),
+        plot.title.position = "panel",
+        plot.subtitle = element_markdown(size = 8, colour = text_colour),
         plot.caption = element_text(size = 8, hjust = 0),
         plot.caption.position = "plot",
         legend.key.width = unit(0.5, "cm"),
-        legend.position = c(.9, .85)
+        legend.position = c(.9, .75),
+        legend.background = element_rect(fill = "transparent", color = NA),
+        legend.box.background = element_rect(fill = "transparent", color = NA),
+        legend.text=element_text(color=text_colour),
+        legend.title=element_text(color=text_colour),
+        panel.background = element_rect(fill = "transparent", color = NA),
+        plot.background = element_rect(fill = "transparent", color = NA)
     ) +
     guides(
         size = "none",
@@ -611,23 +829,22 @@ ggplot() +
     labs(
         x = NULL,
         y = NULL,
-        title = "Spatial distribution of repertoire sizes",
-        subtitle = "*Posterior conditional effects of spatial predictior. <br>
-        Points represent individual repertoire sizes (range 1-9)*"
+        title = "Levels of postnatal dispersal across space",
+        subtitle = "*Posterior conditional effects of spatial predictor*<br>"
         # caption = "\nOther information"
-    )
-#     -> spatial_m_3
-# ggsave(
-#     filename = "spatial_m_3.jpg",
-#     plot = spatial_m_3,
-#     path = dirs$figs,
-#     scale = 1,
-#     width = 13,
-#     height = 13,
-#     units = "cm",
-#     dpi = 350,
-#     limitsize = FALSE
-# )
+    ) -> spatmarg
+ggsave(
+    filename = "spatial_m_3.1.png",
+    plot = spatmarg,
+    path = dirs$figs,
+    scale = 1,
+    width = 13,
+    height = 13,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg="transparent"
+)
 ```
 ### Plot posterior distribution of covariance
 ```{r }
