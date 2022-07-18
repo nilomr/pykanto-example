@@ -236,72 +236,6 @@ def imm_disp_rate(bird_data, coords, box_distmat):
     return imm_disp_df
 
 
-# #%%
-# # Only with k-spatial-n
-# knn_sharing = []
-
-# for year in years:
-#     # Add labels and calculate class means
-#     metric = "cosine"
-#     feat_df = vecdf[vecdf.index.str.contains(year)]
-#     labs = feat_df.index.values
-
-#     # calculate pairwise distances
-#     indx, dists = acoustic_knn(feat_df, metric, ac_knn)
-
-#     wl = len(feat_df)
-#     m = np.zeros(shape=(wl, wl))
-#     for query in with_pbar(feat_df.index):
-#         i = np.where(labs == query)[0][0]
-#         ds, ne = dists[i], labs[indx[i]]
-#         m[i, np.in1d(feat_df.index, ne).nonzero()[0]] = 1
-
-#     # pd.DataFrame(m, index=feat_df.index, columns=feat_df.index)
-
-#     # get nearest spatial neighbours
-#     coordata = bird_data.query(
-#         f"year == '{year}' and repertoire_size == repertoire_size"
-#     )[["x", "y"]]
-
-#     # Calculate sharing with nearest spatial neighbours
-#     labs_dict = {
-#         pnum: [l for l in labs if pnum == l.split("_")[0]]
-#         for pnum in coordata.index
-#     }
-
-#     nn_sharing = []
-#     for pnum1 in tqdm(coordata.index):
-#         rep1 = labs_dict[pnum1]
-#         idx1 = [np.where(labs == i)[0][0] for i in rep1]
-#         for pnum2 in coordata.loc[pnum1, "spatial_nn"]:
-#             rep2 = labs_dict[pnum2]
-#             idx2 = [np.where(labs == i)[0][0] for i in rep2]
-#             shared = m[np.ix_(idx1, idx2)]
-#             # if np.sum(shared) > 1:
-#             #     print(pd.DataFrame(shared, index=rep1, columns=rep2))
-#             nn_sharing.append(
-#                 [pnum1, pnum2, 2 * int(np.sum(shared)), len(rep1) + len(rep2)]
-#             )  # to calculate Song Sharing Index (McGregor and Krebs 1982)
-
-#     nn_sharing_df = pd.DataFrame(
-#         nn_sharing, columns=["bird1", "bird2", "shared", f"total_nn"]
-#     )
-#     nn_sharing_sum_df = nn_sharing_df.groupby(["bird1"]).sum()
-#     nn_sharing_sum_df.index.rename("pnum", inplace=True)
-#     nn_sharing_sum_df = nn_sharing_sum_df.reset_index(level=0)
-#     knn_sharing.append(nn_sharing_sum_df)
-
-
-# knn_sharing_df = pd.concat(knn_sharing)
-# bird_data_sharing = bird_data.merge(
-#     knn_sharing_df, left_on="pnum", right_on="pnum", how="outer"
-# )
-
-# 20211B108 is a good show bird
-
-#%%
-
-
 #%%
 
 # ──── CALCULATE PAIRWISE SONG SHARING ──────────────────────────────────────────
@@ -471,7 +405,52 @@ box_distmat = pd.DataFrame(
     columns=box_data.box,
 ).round(decimals=1)
 
-# TODO: get mean dispersal distance / prop immigrants for neighbourhood
+#%%
+
+# Add dispersal distance to bird data
+dispdist = []
+for pnum in with_pbar(bird_data.index):
+    box = bird_data.loc[pnum].box
+    natal_box = bird_data.loc[pnum].natal_box
+    if natal_box == natal_box:
+        dispdist.append(box_distmat.loc[box, natal_box])
+    else:
+        dispdist.append(np.nan)
+
+bird_data["dispersal_distance"] = dispdist
+
+# Export dyadic data
+bird_data_sub = bird_data[
+    [
+        "april_lay_date",
+        "clutch_size",
+        "num_fledglings",
+        "father",
+        "mother",
+        "box",
+        "year",
+        "wytham_born",
+        "natal_box",
+        "dispersal_distance",
+        "age",
+        "x",
+        "y",
+        "recorded",
+        "repertoire_size",
+        "self_similarity",
+    ]
+]
+
+nn_sharing_df_full = (
+    drop_swap_duplicates(pair_sharing_df, ["bird1", "bird2"])
+    .merge(bird_data_sub.add_suffix("_1"), right_index=True, left_on="bird1")
+    .merge(bird_data_sub.add_suffix("_2"), right_index=True, left_on="bird2")
+)
+
+
+#%%
+
+# get mean dispersal distance / prop immigrants for neighbourhood
 sp_knn = 10  # twice the acoustic neighbors to avoid tiny sample
 
 immdisp = []
@@ -487,6 +466,23 @@ for year in years:
 bird_data_complete = bird_data.join(pd.concat(immdisp))
 
 
+imm, disp = [], []
+for pnum in with_pbar(coords.index):
+    residents = []
+    dispdist = []
+    for pnum1 in coords.loc[pnum, "spatial_nn"]:
+        ims = bird_data.loc[pnum1, "wytham_born"]
+        residents.append(ims)
+        if ims:
+            nat = bird_data.loc[pnum1, "natal_box"]
+            dispdist.append(box_distmat.loc[nat, pnum1[5:]])
+    imm.append(1 - np.mean(residents))
+    disp.append(np.round(np.mean(dispdist), decimals=1))
+
+dfd = {"prop_immigrants": imm, "mean_dispersal": disp}
+imm_disp_df = pd.DataFrame(dfd, index=coords.index)
+
+
 #%%
 
 # ──── SAVE DATA ────────────────────────────────────────────────────────────────
@@ -496,7 +492,9 @@ bird_data_complete.to_csv(
     DIRS.RESOURCES / "bird_data" / f"full_dataset_{'-'.join(years)}.csv"
 )
 
-
+nn_sharing_df_full.to_csv(
+    DIRS.RESOURCES / "bird_data" / f"dyad_dataset_{'-'.join(years)}.csv"
+)
 #%%
 pnum = "20201B11"
 pair_sharing_df.loc[pnum]
