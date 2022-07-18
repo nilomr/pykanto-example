@@ -15,6 +15,7 @@ from pkg_resources import load_entry_point
 from pykanto.utils.compute import with_pbar
 from pykanto.utils.paths import ProjDirs, link_project_data
 from pynndescent import NNDescent
+from scipy.spatial import distance_matrix
 
 # %%
 # MDS
@@ -36,7 +37,7 @@ PROJECT_ROOT = Path(
     git.Repo(".", search_parent_directories=True).working_tree_dir
 )
 DATASET_ID = "GRETI_2021-22"
-years = ["2021", "2022"]
+years = ["2020", "2021"]
 
 data_path = PROJECT_ROOT / "data" / "datasets" / DATASET_ID / "ML"
 train_path, test_path = data_path / "train", data_path / "test"
@@ -54,7 +55,7 @@ vector_dir = (
 # DATA_LOCATION = Path("/data/zool-songbird/shil5293/data/wytham-great-tit")
 # link_project_data(DATA_LOCATION, PROJECT_ROOT / "data")
 
-segmented_dir = PROJECT_ROOT / "data" / "segmented" / DATASET_ID.lower()[:-3]
+segmented_dir = PROJECT_ROOT / "data"  # / "segmented" / DATASET_ID.lower()[:-3]
 DIRS = ProjDirs(PROJECT_ROOT, segmented_dir, DATASET_ID, mkdir=True)
 
 # %% [markdown]
@@ -73,6 +74,11 @@ bird_data["year"] = bird_data["year"].apply(str)
 coord_df = bird_data[["x", "y"]].copy()
 coord_df["xy"] = coord_df[["x", "y"]].values.tolist()
 coord_df = pd.DataFrame(coord_df["xy"], index=bird_data.index, columns=["xy"])
+
+# Get box infomation
+fb = DIRS.RESOURCES / "bird_data" / "nestbox_coordinates.csv"
+box_data = pd.read_csv(fb)
+box_data["box"] = box_data["box"].str.upper()
 
 # %% [markdown]
 # ## Feature vectors
@@ -142,72 +148,6 @@ def acoustic_knn(
     return indx[:, 1:], dists[:, 1:]
 
 
-#%%
-# Only with k-spatial-n
-knn_sharing = []
-
-for year in years:
-    # Add labels and calculate class means
-    metric = "cosine"
-    feat_df = vecdf[vecdf.index.str.contains(year)]
-    labs = feat_df.index.values
-
-    # calculate pairwise distances
-    indx, dists = acoustic_knn(feat_df, metric, ac_knn)
-
-    wl = len(feat_df)
-    m = np.zeros(shape=(wl, wl))
-    for query in with_pbar(feat_df.index):
-        i = np.where(labs == query)[0][0]
-        ds, ne = dists[i], labs[indx[i]]
-        m[i, np.in1d(feat_df.index, ne).nonzero()[0]] = 1
-
-    # pd.DataFrame(m, index=feat_df.index, columns=feat_df.index)
-
-    # get nearest spatial neighbours
-    coordata = bird_data.query(
-        f"year == '{year}' and repertoire_size == repertoire_size"
-    )[["x", "y"]]
-
-    # Calculate sharing with nearest spatial neighbours
-    labs_dict = {
-        pnum: [l for l in labs if pnum == l.split("_")[0]]
-        for pnum in coordata.index
-    }
-
-    nn_sharing = []
-    for pnum1 in tqdm(coordata.index):
-        rep1 = labs_dict[pnum1]
-        idx1 = [np.where(labs == i)[0][0] for i in rep1]
-        for pnum2 in coordata.loc[pnum1, "spatial_nn"]:
-            rep2 = labs_dict[pnum2]
-            idx2 = [np.where(labs == i)[0][0] for i in rep2]
-            shared = m[np.ix_(idx1, idx2)]
-            # if np.sum(shared) > 1:
-            #     print(pd.DataFrame(shared, index=rep1, columns=rep2))
-            nn_sharing.append(
-                [pnum1, pnum2, 2 * int(np.sum(shared)), len(rep1) + len(rep2)]
-            )  # to calculate Song Sharing Index (McGregor and Krebs 1982)
-
-    nn_sharing_df = pd.DataFrame(
-        nn_sharing, columns=["bird1", "bird2", "shared", f"total_nn"]
-    )
-    nn_sharing_sum_df = nn_sharing_df.groupby(["bird1"]).sum()
-    nn_sharing_sum_df.index.rename("pnum", inplace=True)
-    nn_sharing_sum_df = nn_sharing_sum_df.reset_index(level=0)
-    knn_sharing.append(nn_sharing_sum_df)
-
-
-knn_sharing_df = pd.concat(knn_sharing)
-bird_data_sharing = bird_data.merge(
-    knn_sharing_df, left_on="pnum", right_on="pnum", how="outer"
-)
-
-# 20211B108 is a good show bird
-
-#%%
-
-
 def get_shared_songs(
     bird_data: pd.DataFrame,
     feat_df: pd.DataFrame,
@@ -261,8 +201,105 @@ def get_shared_songs(
 
 def drop_swap_duplicates(df, colnames: List[str]):
     df[colnames] = np.sort(df[colnames].values, axis=1)
-    df.drop_duplicates(colnames, inplace=True)
+    df = df.drop_duplicates(colnames)
     return df
+
+
+def imm_disp_rate(bird_data, coords, box_distmat):
+    """
+    calculate proportion of knn that are immigrants and
+    mean dispersal distance for birds that were born in the population
+
+    Args:
+        bird_data (_type_): _description_
+        coords (_type_): _description_
+        box_distmat (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    imm, disp = [], []
+    for pnum in with_pbar(coords.index):
+        residents = []
+        dispdist = []
+        for pnum1 in coords.loc[pnum, "spatial_nn"]:
+            ims = bird_data.loc[pnum1, "wytham_born"]
+            residents.append(ims)
+            if ims:
+                nat = bird_data.loc[pnum1, "natal_box"]
+                dispdist.append(box_distmat.loc[nat, pnum1[5:]])
+        imm.append(1 - np.mean(residents))
+        disp.append(np.round(np.mean(dispdist), decimals=1))
+
+    dfd = {"prop_immigrants": imm, "mean_dispersal": disp}
+    imm_disp_df = pd.DataFrame(dfd, index=coords.index)
+    return imm_disp_df
+
+
+# #%%
+# # Only with k-spatial-n
+# knn_sharing = []
+
+# for year in years:
+#     # Add labels and calculate class means
+#     metric = "cosine"
+#     feat_df = vecdf[vecdf.index.str.contains(year)]
+#     labs = feat_df.index.values
+
+#     # calculate pairwise distances
+#     indx, dists = acoustic_knn(feat_df, metric, ac_knn)
+
+#     wl = len(feat_df)
+#     m = np.zeros(shape=(wl, wl))
+#     for query in with_pbar(feat_df.index):
+#         i = np.where(labs == query)[0][0]
+#         ds, ne = dists[i], labs[indx[i]]
+#         m[i, np.in1d(feat_df.index, ne).nonzero()[0]] = 1
+
+#     # pd.DataFrame(m, index=feat_df.index, columns=feat_df.index)
+
+#     # get nearest spatial neighbours
+#     coordata = bird_data.query(
+#         f"year == '{year}' and repertoire_size == repertoire_size"
+#     )[["x", "y"]]
+
+#     # Calculate sharing with nearest spatial neighbours
+#     labs_dict = {
+#         pnum: [l for l in labs if pnum == l.split("_")[0]]
+#         for pnum in coordata.index
+#     }
+
+#     nn_sharing = []
+#     for pnum1 in tqdm(coordata.index):
+#         rep1 = labs_dict[pnum1]
+#         idx1 = [np.where(labs == i)[0][0] for i in rep1]
+#         for pnum2 in coordata.loc[pnum1, "spatial_nn"]:
+#             rep2 = labs_dict[pnum2]
+#             idx2 = [np.where(labs == i)[0][0] for i in rep2]
+#             shared = m[np.ix_(idx1, idx2)]
+#             # if np.sum(shared) > 1:
+#             #     print(pd.DataFrame(shared, index=rep1, columns=rep2))
+#             nn_sharing.append(
+#                 [pnum1, pnum2, 2 * int(np.sum(shared)), len(rep1) + len(rep2)]
+#             )  # to calculate Song Sharing Index (McGregor and Krebs 1982)
+
+#     nn_sharing_df = pd.DataFrame(
+#         nn_sharing, columns=["bird1", "bird2", "shared", f"total_nn"]
+#     )
+#     nn_sharing_sum_df = nn_sharing_df.groupby(["bird1"]).sum()
+#     nn_sharing_sum_df.index.rename("pnum", inplace=True)
+#     nn_sharing_sum_df = nn_sharing_sum_df.reset_index(level=0)
+#     knn_sharing.append(nn_sharing_sum_df)
+
+
+# knn_sharing_df = pd.concat(knn_sharing)
+# bird_data_sharing = bird_data.merge(
+#     knn_sharing_df, left_on="pnum", right_on="pnum", how="outer"
+# )
+
+# 20211B108 is a good show bird
+
+#%%
 
 
 #%%
@@ -273,11 +310,12 @@ def drop_swap_duplicates(df, colnames: List[str]):
 # the k-nearest neighbours of another bird's song
 
 # Settings
-ac_knn = 20  # How many neighbors to use for acoustic similarity
-sp_knn = 5  # How many spatial neighbors to use
+ac_knn = 15  # How many neighbors to use for acoustic similarity
+sp_knn = 10  # How many spatial neighbors to use
+metric = "cosine"
 
 nn_sharing = [
-    get_shared_songs(bird_data, vecdf, ac_knn, year, metric="cosine")
+    get_shared_songs(bird_data, vecdf, ac_knn, year, metric=metric)
     for year in years
 ]
 nn_sharing_df = pd.concat(nn_sharing).query("bird1!=bird2")
@@ -294,9 +332,9 @@ mat_df = pd.DataFrame(mx, index=vecdf.index, columns=vecdf.index)
 tall_mat = (
     mat_df.stack()
     .reset_index()
-    .rename(columns={"level_0": "class1", "level_1": "class2", 0: "ac_dist"})
+    .rename(columns={"level_0": "class1", "level_1": "class2", 0: "ac_sim"})
 )
-tall_mat = tall_mat.query("ac_dist != 1")
+tall_mat = tall_mat.query("ac_sim != 1")
 tall_mat["bird1"] = tall_mat.class1.apply(lambda x: x.split("_")[0])
 tall_mat["bird2"] = tall_mat.class2.apply(lambda x: x.split("_")[0])
 tall_mat["year1"] = tall_mat.class1.apply(lambda x: x[:4])
@@ -304,17 +342,12 @@ tall_mat["year2"] = tall_mat.class2.apply(lambda x: x[:4])
 
 # Add spatial distances to similarity dataframe
 selfsim_mean = tall_mat.query("bird1==bird2").groupby(["bird1", "year1"]).mean()
-othersim_mean = (
-    tall_mat.query("bird1!=bird2").groupby(["bird1", "year1"]).mean()
-)
-selfsim_mean["cat"], othersim_mean["cat"] = "self", "other"
-allsim = pd.concat([selfsim_mean, othersim_mean])
-
+selfsim_mean["cat"] = "self"
 selfsim_mean.reset_index(level=1, drop=True, inplace=True)
 selfsim_mean.index = selfsim_mean.index.set_names(["pnum"])
 
 # Add self-similarity to data
-bird_data["self_similarity"] = selfsim_mean["ac_dist"]
+bird_data["self_similarity"] = selfsim_mean["ac_sim"]
 
 # Get all pairwise mean similarities
 pairwise = []
@@ -352,31 +385,120 @@ pair_sharing_df["sharing_index"] = (
 # Relationship between similarity and repertoire-sharing
 sns.lmplot(
     data=pair_sharing_df.query("sharing_index >0"),
-    x="ac_dist",
+    x="ac_sim",
     y="sharing_index",
     scatter_kws={"alpha": 0.05},
 )
 
 # %%
-# TODO: get proportion of neighbours that are immigrant for each bird
+
 
 # Add sharing with all other birds to bird data
-
-bird_data = bird_data.merge(pair_sharing_df.groupby(["bird1"]).mean()[['ac_dist']], left_on="pnum", right_on="bird1", how="outer")
+bird_data = (
+    bird_data.reset_index()
+    .merge(
+        pair_sharing_df.groupby(["bird1"]).mean()[["ac_sim"]],
+        left_on="pnum",
+        right_on="bird1",
+        how="outer",
+    )
+    .set_index("pnum")
+)
 
 # get nearest spatial neighbours for each bird and how many songs they share
+def kn_spatial_n(bird_data: pd.DataFrame, year: str, sp_knn: int = 5):
+    coordata = bird_data.query(
+        f"year=='{year}' and repertoire_size == repertoire_size"
+    )[["x", "y"]]
+    tree = BallTree(coordata.values, metric="euclidean")
+    _, indices = tree.query(coordata.values, k=sp_knn + 1)
+    coordata["spatial_nn"] = [coordata.index[i].values[1:] for i in indices]
+    return coordata
+
+
+coordata = pd.concat([kn_spatial_n(bird_data, year, sp_knn) for year in years])
+
+nns = []
+cols = [
+    "bird1",
+    "bird2",
+    "shared",
+    "total_rep",
+    "ac_sim",
+    "spatial_dist",
+    "sharing_index",
+]
+# TODO: get proportion of neighbours that are immigrant for each bird
+for pnum in with_pbar(coordata.index):
+    for pnum1 in coordata.loc[pnum, "spatial_nn"]:
+        nns.append(
+            pair_sharing_df.query("bird1 == @pnum and bird2 == @pnum1")[
+                cols
+            ].values.tolist()[0]
+        )
+nn_sharing_df = pd.DataFrame(
+    nns,
+    columns=cols,
+)
+
+nn_sharing_summary_df = nn_sharing_df.groupby("bird1").sum()
+nn_sharing_summary_df["mean_spat_dist"] = nn_sharing_df.groupby("bird1").mean()[
+    "spatial_dist"
+]
+nn_sharing_summary_df["mean_ac_sim"] = nn_sharing_df.groupby("bird1").mean()[
+    "ac_sim"
+]
+
+bird_data = (
+    bird_data.reset_index()
+    .merge(
+        nn_sharing_summary_df[
+            ["shared", "total_rep", "mean_spat_dist", "mean_ac_sim"]
+        ],
+        left_on="pnum",
+        right_on="bird1",
+        how="outer",
+    )
+    .set_index("pnum")
+)
+
+#%%
+
+# Build spatial distance matrix for boxes
+box_distmat = pd.DataFrame(
+    distance_matrix(box_data[["x", "y"]].values, box_data[["x", "y"]].values),
+    index=box_data.box,
+    columns=box_data.box,
+).round(decimals=1)
+
+# TODO: get mean dispersal distance / prop immigrants for neighbourhood
+sp_knn = 10  # twice the acoustic neighbors to avoid tiny sample
+
+immdisp = []
 for year in years:
+    coords = bird_data.query(f"year=='{year}' and father==father")[["x", "y"]]
+    tree = BallTree(coords.values, metric="euclidean")
+    _, indices = tree.query(coords.values, k=sp_knn + 1)
+    coords["spatial_nn"] = [coords.index[i].values[1:] for i in indices]
 
-year='2020'
+    # calculate neighbourhood immigration and dispersal levels
+    immdisp.append(imm_disp_rate(bird_data, coords, box_distmat))
 
-coordata = bird_data.query(f"father == father and year=='{year}'")[["x", "y"]]
-tree = BallTree(coordata.values, metric="euclidean")
-distances, indices = tree.query(coordata.values, k=sp_knn + 1)
-coordata["spatial_nn"] = [coordata.index[i].values[1:] for i in indices]
+bird_data_complete = bird_data.join(pd.concat(immdisp))
 
-coordata["spatial_nn"]
 
-pnum = '20201B11'
+#%%
+
+# ──── SAVE DATA ────────────────────────────────────────────────────────────────
+
+
+bird_data_complete.to_csv(
+    DIRS.RESOURCES / "bird_data" / f"full_dataset_{'-'.join(years)}.csv"
+)
+
+
+#%%
+pnum = "20201B11"
 pair_sharing_df.loc[pnum]
 
 
@@ -391,14 +513,9 @@ nn_sharing_sum_df = nn_sharing_sum_df.reset_index(level=0)
 knn_sharing.append(nn_sharing_sum_df)
 
 
-pair_sharing_df
-
-coordata
-
-# TODO: get mean dispersal distance for neighbourhood
+# TODO: get mean dispersal distance / prop immigrants for neighbourhood
 for pnum in tqdm(coordata.index):
     pair_sharing_df.loc[coordata.loc[pnum, "spatial_nn"]]
-    ...
 
 
 # %%
@@ -417,11 +534,35 @@ sns.catplot(
 
 sns.catplot(data=bird_data, x="wytham_born", y="repertoire_size", kind="violin")
 
+kk = bird_data_complete.copy()
+kk["sharing_index"] = kk["shared"] / kk["total_rep"]
 
 sns.lmplot(
-    data=pair_sharing_df,
-    x="spatial_dist",
-    y="ac_dist",
+    data=kk,
+    y="repertoire_size",
+    x="dispersal_index",
+    scatter_kws={"alpha": 0.05},
+)
+plt.yscale("log")
+
+mean_spat_dist
+
+sns.relplot(
+    x="x",
+    y="y",
+    hue="mean_spat_dist",
+    size="mean_spat_dist",
+    sizes=(40, 400),
+    alpha=0.5,
+    height=6,
+    data=bird_data_complete,
+)
+
+
+sns.lmplot(
+    data=nn_sharing_summary_df,
+    x="mean_spat_dist",
+    y="mean_ac_sim",
     scatter_kws={"alpha": 0.05},
     lowess=True,
 )
@@ -614,9 +755,6 @@ diag = pd.Series(
     np.diag(class_dist_mat),
     index=[class_dist_mat.index, class_dist_mat.columns],
 )
-
-
-mx
 
 
 l = "B227_1"
