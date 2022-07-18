@@ -86,9 +86,9 @@ target/
 /resources/fieldwork/
 /references/
 /test/
-/reports/
+
 /dependencies/chipper_v1.0_linux
-/reports/figures/*
+
 /reports/text/talks
 embedding_remove
 pykanto/data/datasets
