@@ -133,6 +133,8 @@ elif "segmented" in str(DIRS.RAW_DATA):
     warnings.warn(
         "Trying to read existing pnums from file (raw data folder missing)"
     )
+    # TODO: filter df by recorded == True before getting values!
+    # Otherwise will get last attempt if > 1 attempts
     d = dict(pd.read_csv(bird_data_outdir)[["pnum", "box"]].values)
     d_pnum = {v: k for k, v in d.items()}
     print(f"Found {len(d_pnum)} pnums")
