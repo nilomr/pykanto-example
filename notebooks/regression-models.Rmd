@@ -1,0 +1,676 @@
+# Dependencies
+```{r imports}
+
+box::use(brms[...])
+box::use(readr[read_csv])
+box::use(dplyr[...])
+box::use(tidyr[spread, separate, gather, expand, nesting])
+box::use(ggplot2[...])
+box::use(scales[...])
+box::use(terra[...])
+box::use(geosphere[perimeter])
+box::use(plyr[round_any])
+box::use(ggtext[element_markdown])
+box::use(tidybayes[...])
+box::use(forcats[fct_relevel])
+box::use(emmeans[...])
+```
+
+# Function definitions
+```{r}
+# Plot theme
+globtheme <- theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.ticks = element_blank(),
+    panel.background = element_rect(
+        fill = "#f0f0f0",
+        colour = "#f0f0f0",
+        size = 0.5,
+        linetype = "solid"
+    ),
+    axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)),
+    axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 0, l = 0))
+)
+```
+
+# Import data
+```{r directories}
+dirs <- list()
+dirs$root <- rprojroot::find_rstudio_root_file()
+dirs$resources <- file.path(dirs$root, "resources")
+dirs$figs <- file.path(dirs$root, "reports", "figures")
+dirs$data <- file.path(dirs$root, "data")
+dirs$model_fits <- file.path(dirs$data, "models", "fits")
+for (dir in dirs) {
+    if (!dir.exists(dir)) {
+        dir.create(dir, recursive = TRUE)
+    }
+}
+```
+
+```{r import-data}
+data <- read_csv(file.path(dirs$resources, "bird_data", "full_dataset_2020-2021.csv"))
+
+data <- data %>% mutate(sharing_index = shared / total_rep)
+# filter(sampling_effort >= 15) %>% # Birds with fewer than 15 songs were not checked
+# mutate(
+#     immigration = as.factor(as.integer(immigration == "imm")),
+#     year = as.factor(year),
+#     repertoire_size = as.integer(repertoire_size),
+#     sampling_effort = as.integer(sampling_effort),
+#     lay_delay = as.integer(lay_delay)
+# )
+
+print(paste("The number of distinct ID'd birds is", n_distinct(data$father)))
+```
+
+
+# Model definitons
+
+```{r}
+data %>% ggplot(aes(x = repertoire_size)) +
+    geom_histogram()
+```
+
+```{r gp-test}
+
+#  1 + prop_immigrants + mean_dispersal + year + (1 | father) +
+# gp(x, y, k = 15, scale = TRUE, c = 5 / 4)
+m_0_f <- brmsformula(sharing_index ~ 1 +
+    prop_immigrants + mean_dispersal +
+    s(x, y),
+family = hurdle_lognormal()
+)
+
+# Density and year have no effect, removed them
+
+m_1_f <- brmsformula(sharing_index ~ 1 +
+    prop_immigrants + mean_spat_dist + (1 | father) +
+    gp(x, y, k = 10, scale = TRUE, c = 5 / 4),
+family = hurdle_lognormal()
+)
+
+# Spatial distribution of level of song-sharing
+m_2_f <- brmsformula(sharing_index ~ 1 +
+    gp(x, y, k = 20, scale = TRUE, c = 5 / 4),
+family = hurdle_lognormal()
+)
+
+# Spatial distribution of immigration levels
+m_3_f <- brmsformula(prop_immigrants ~ 1 +
+    gp(x, y, k = 20, scale = TRUE, c = 5 / 4),
+family = gaussian()
+)
+
+
+m_4_f <- brmsformula(sharing_index ~ 1 +
+    prop_immigrants * wytham_born + (1 | father) +
+    s(x, y),
+family = hurdle_lognormal()
+)
+
+m_5_f <- brmsformula(repertoire_size ~ 1 +
+    prop_immigrants + wytham_born + mean_spat_dist + year + (1 | father) +
+    s(x, y),
+family = gaussian()
+)
+
+
+
+# https://www.andrewheiss.com/blog/2022/05/09/hurdle-lognormal-gaussian-brms/#2-hurdle-lognormal-model-on-a-non-exponential-outcome
+```
+
+```{r }
+get_prior(m_4_f, data = data)
+
+
+m_0 <-
+    brm(
+        formula = m_0_f,
+        data = data,
+        # prior = priors,
+        iter = 1000, warmup = 500,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_0"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.999, max_treedepth = 20)
+    )
+
+m_1 <-
+    brm(
+        formula = m_1_f,
+        data = data,
+        # prior = priors,
+        iter = 1500, warmup = 500,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_1"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.999, max_treedepth = 20)
+    )
+
+m_2 <-
+    brm(
+        formula = m_2_f,
+        data = data,
+        # prior = priors,
+        iter = 1500, warmup = 500,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_2"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.999, max_treedepth = 20)
+    )
+
+m_3 <-
+    brm(
+        formula = m_3_f,
+        data = data,
+        # prior = priors,
+        iter = 1500, warmup = 500,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_3"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.999, max_treedepth = 20)
+    )
+
+priors <- c(
+    prior(normal(0, 0.1), class = "b", coef = "prop_immigrants"),
+    prior(normal(0, 0.1), class = "b", coef = "wytham_bornTRUE")
+)
+
+
+m_4 <-
+    brm(
+        formula = m_4_f,
+        data = data,
+        # prior = priors,
+        iter = 4000, warmup = 600,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_4"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.9999, max_treedepth = 20)
+    )
+
+m_5 <-
+    brm(
+        formula = m_5_f,
+        data = data,
+        # prior = priors,
+        iter = 4000, warmup = 600,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_5"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.99, max_treedepth = 20)
+    )
+```
+
+
+```{r}
+
+pp_check(m_0, ndraws = 100)
+pp_check(m_4, ndraws = 100)
+
+conditional_effects(m_0, effects = "prop_immigrants")
+conditional_effects(m_4)
+conditional_effects(m_5)
+
+
+me_loss_prior1 <- conditional_effects(
+    m_0,
+    re_formula = NULL, method = "predict"
+)
+
+p0 <- plot(me_loss_prior1, ncol = 5, points = TRUE, plot = FALSE)
+p0$dev + ggtitle("Prior predictive distributions")
+```
+# Plot model outcomes
+
+## Mean and sd pp check
+```{r pp-checks}
+
+# Plots for model 3
+
+# Mean and sd
+pp3 <- pp_check(m_3, type = "stat_2d")
+pp_m3_data <- pp3$data %>%
+    mutate(variable = gsub("_.*", "\\1", variable)) %>%
+    rename(mean = value, sd = value2) %>%
+    arrange(desc(variable))
+
+ycoords <- pp_m3_data %>% filter(variable == "y")
+y_min <- min(pp_m3_data$sd)
+y_max <- max(pp_m3_data$sd)
+x_min <- min(pp_m3_data$mean)
+x_max <- max(pp_m3_data$mean)
+
+
+pp_m3_data %>%
+    ggplot(aes(
+        x = mean, y = sd, alpha = variable,
+        color = variable, size = variable
+    )) +
+    geom_point() +
+    geom_segment(
+        data = ycoords, aes(xend = mean, yend = -Inf),
+        size = .5, linetype = "dashed"
+    ) +
+    geom_segment(
+        data = ycoords, aes(xend = -Inf, yend = sd),
+        size = .5, linetype = "dashed"
+    ) +
+    scale_color_manual("*T = (mean, sd)*",
+        values = c("#c5640a", "#5c94a5"),
+        labels = c("*T(y)*", "*T(y rep)*")
+    ) +
+    scale_alpha_manual(values = c(1, .07)) +
+    scale_size_manual(values = c(3, 1)) +
+    scale_y_continuous(breaks = round(seq(f = y_min, t = y_max, by = .2),
+        digits = 1
+    )) +
+    scale_x_continuous(breaks = round(seq(f = x_min, t = x_max, by = .2),
+        digits = 1
+    )) +
+    guides(
+        alpha = "none",
+        size = "none",
+        color = guide_legend(override.aes = list(linetype = 0))
+    ) +
+    labs(
+        title = "Graphical posterior predictive check",
+        subtitle = "*repertoire_size ~
+1 + immigrant + sampling_eff + year + s(x, y) + (1 | bird_id)*\n\n",
+        caption = ""
+    ) +
+    theme(
+        legend.text = element_markdown(family = "Times"),
+        legend.title = element_markdown(family = "Times"),
+        aspect.ratio = 1,
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        text = element_text(size = 12),
+        plot.title = element_text(size = 14, face = "bold"),
+        plot.title.position = "plot",
+        plot.subtitle = element_markdown(size = 8, colour = "#363636"),
+        plot.caption = element_text(size = 8, hjust = 0),
+        plot.caption.position = "plot"
+    ) -> pp3_plot
+
+
+ggsave(
+    pp3_plot,
+    path = dirs$figs,
+    filename = "posterior_pred_m_3.png",
+    width = 14,
+    height = 12,
+    units = "cm",
+    dpi = 350
+)
+```
+
+```{r }
+pp_check(m_3, ndraws = 100)
+pp_check(m_3, type = "stat_2d")
+plot(m_3)
+plot(m_1)
+conditional_effects(m_3)
+# Extract conditional effects of spatial term conditioning on year:
+conditional_effects(m_4,
+    plot = TRUE,
+    effects = "x:y",
+    surface = TRUE,
+    resolution = 50,
+    conditions = make_conditions(m_4, vars = "year")
+)
+
+
+
+conditional_effects(m_4)
+```
+# Extract variance components
+
+```{r variance comp}
+
+VarCorr(m_0)
+```
+## Plot cond effects
+
+```{r}
+m_5 %>%
+    emmeans(~wytham_born,
+        var = "wytham_born",
+        at = list(wytham_born = c(TRUE, FALSE)),
+        epred = TRUE
+    ) %>%
+    gather_emmeans_draws() %>%
+    ggplot(aes(x = wytham_born, y = .value)) +
+    stat_interval(size = 5) +
+    scale_color_manual(values = colorspace::lighten("#00709c", c(0.95, 0.7, 0.4))) +
+    # scale_y_continuous(labels = label_comma()) +
+    labs(
+        x = "wytham_born", y = "Proportion shared songs",
+        subtitle = "Expected values from mu and hu parts (epred = TRUE)",
+        fill = "Credible interval"
+    ) +
+    theme(legend.position = "bottom")
+
+
+m_0 |>
+    emmeans(~prop_immigrants,
+        var = "prop_immigrants", dpar = "mu",
+        regrid = "response", tran = "log", type = "response",
+        at = list(prop_immigrants = seq(0, 1, 1))
+    ) |>
+    gather_emmeans_draws() |>
+    mutate(.value = exp(.value)) |>
+    ggplot(aes(x = prop_immigrants, y = .value)) +
+    stat_lineribbon(size = 1, color = "darkorange") +
+    scale_fill_manual(values = colorspace::lighten("darkorange", c(0.95, 0.7, 0.4))) +
+    scale_y_continuous(labels = label_comma()) +
+    labs(
+        x = "prop_immigrants", y = "prop shared songs",
+        subtitle = "Regular part of the model (dpar = \"mu\")",
+        fill = "Credible interval"
+    ) +
+    theme(legend.position = "bottom")
+```
+## Plot posterior estimates of main effects
+```{r posterior estimates}
+# Check internal variable names
+get_variables(m_3)
+# Get samples from the posteriors
+m_3_posteriors <- posterior_samples(m_3) %>%
+    gather() %>%
+    mutate(key = factor(key)) %>%
+    filter(key != "b_Intercept", key != "lp__") %>%
+    filter(key %in% c("b_immigration1", "sd_male_ring__Intercept", "b_year2021"))
+
+# Order of variables in y axis
+plt_order <- list(rev(c("b_immigration1", "b_year2021", "sd_male_ring__Intercept")), rev(c("Immigrant status", "Year", "SD Bird ID")))
+# Plot
+m_3_posteriors %>%
+    ggplot(aes(x = value, y = fct_relevel(key, plt_order[[1]]))) +
+    geom_vline(
+        xintercept = 0,
+        color = "grey",
+        size = 1
+    ) +
+    stat_dotsinterval(
+        point_interval = mode_hdi,
+        .width = c(.90, .5), binwidth = 0.04,
+        slab_color = "#2689a6",
+        fill = "#2689a6",
+        quantiles = 80,
+        stackratio = 1
+    ) +
+    theme(
+        panel.grid = element_blank(),
+        aspect.ratio = 1
+    ) +
+    # coord_cartesian(xlim = c(0, 2.5), ylim = c(1.3, NA)) +
+    scale_y_discrete(labels = plt_order[[2]]) +
+    labs(
+        y = NULL,
+        x = "\nEstimate",
+        title = "Posterior distribution of parameter estimates",
+        subtitle = "Results of the bayesian regression model. <br>
+        *repertoire_size ~
+1 + immigrant + sampling_eff + year + s(x, y) + (1 | bird_id)*\n\n"
+    ) +
+    theme(
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        text = element_text(size = 12),
+        plot.title = element_text(size = 14, face = "bold"),
+        plot.title.position = "plot",
+        plot.subtitle = element_markdown(size = 8, colour = "#363636"),
+        plot.caption = element_text(size = 8, hjust = 0),
+        plot.caption.position = "plot"
+    ) -> posteriors_plot
+
+ggsave(
+    filename = "posterior_estimates_m_3.jpg",
+    plot = posteriors_plot,
+    path = dirs$figs,
+    scale = 1,
+    width = 13,
+    height = 13,
+    units = "cm",
+    dpi = 300,
+    limitsize = FALSE
+)
+```
+
+## Plot spatial effects
+
+
+```{r}
+#' Returns a tibble with conditional effects of spatial predictors.
+#'
+#' @param model An object of class brmsfit.
+#' @param varnames A character vector naming effects.
+#' @param resolution Number of points used.
+#' @return A tibble containing estimates.
+spatial_cond_effs <- function(model,
+                              varnames = "x:y",
+                              resolution = 200) {
+    gp_plot <- conditional_effects(
+        x = model,
+        effects = varnames,
+        ndraws = 500,
+        resolution = resolution,
+        surface = TRUE,
+        robust = TRUE,
+        points = TRUE,
+        plot = FALSE
+    )
+    vars <- strsplit(varnames, split = ":")[[1]]
+    spatdata <- plot(gp_plot, plot = FALSE, stype = "raster")
+    estimates <- ggplot_build(spatdata[[1]])$plot$data %>%
+        .[, c(vars[1], vars[2], "estimate__", "se__")] %>%
+        as_tibble() %>%
+        rename(estimate = estimate__, se = se__)
+
+    return(estimates)
+}
+```
+
+```{r }
+# Read in woodland contour (with gaps)
+epsg_code <- "epsg:27700"
+perimeter <- vect(file.path(
+    dirs$resources, "ww_contour", "wytham_perimeter.shp"
+))
+terra::crs(perimeter) <- epsg_code
+
+# Used nestbox locations
+nestbox_locs <- data %>% select(x, y)
+```
+
+```{r}
+# Get estimates and mask to contour of study site
+
+# 1. Conditional effects of Gaussian process
+
+resolution <- 300
+est <- spatial_cond_effs(
+    m_5,
+    varnames = "x:y",
+    resolution = resolution
+)
+
+# Expand borders by repeating values:
+expand_rast <- function(df, axis = 0, position = "first") {
+    uniquex <- unique(if (axis == 1) df$x else df$y)
+    if (position == "first") {
+        v <- min(if (axis == 1) df$x else df$y)
+        xseq <- seq(v, v - 100, (uniquex[1] - uniquex[2]))
+    } else if (position == "last") {
+        v <- max(if (axis == 1) df$x else df$y)
+        val0 <- v
+        val1 <- val0 + 100
+        xseq <- seq(val0, val1, -1 * (uniquex[1] - uniquex[2]))
+    } else {
+        stop("Position must be 'first' or 'last'")
+    }
+    ex <- df[if (axis == 1) df$x == v else df$y == v, ]
+    if (axis == 1) {
+        tobind <- tibble(x = rep(xseq, each = length(ex$y)), y = rep(ex$y, times = length(xseq)))
+    } else {
+        tobind <- tibble(y = rep(xseq, each = length(ex$y)), x = rep(ex$x, times = length(xseq)))
+    }
+    tobind <- tobind %>% mutate(
+        estimate = rep(ex$estimate, times = length(xseq)),
+        se = rep(ex$se, times = length(xseq))
+    )
+    return(tobind)
+}
+
+# subtract the next number from each number in the list uniquex:
+margins <- list()
+margins[[1]] <- expand_rast(est, axis = 1, position = "first")
+margins[[2]] <- expand_rast(est, axis = 0, position = "first")
+margins[[3]] <- expand_rast(est, axis = 1, position = "last")
+margins[[4]] <- expand_rast(est, axis = 0, position = "last")
+margins[[5]] <- est
+ex_est <- do.call(rbind, margins)
+
+# 2. Mask
+masked_rast <- rast(ex_est, type = "xyz") %>%
+    terra::mask(., perimeter) %>%
+    terra::as.data.frame(xy = TRUE) %>%
+    as_tibble()
+```
+```{r}
+
+x_max <- max(masked_rast$estimate)
+x_min <- min(masked_rast$estimate)
+colticks <- round(seq(f = x_min, t = x_max, by = .4), digits = 1)
+
+ggplot() +
+    geom_sf(data = sf::st_as_sf(perimeter), color = NA, fill = "#616161") +
+    geom_raster(data = masked_rast, aes(x = x, y = y, fill = estimate)) +
+    # geom_point(
+    #     data = data, aes(
+    #         x = x, y = y,
+    #         size = repertoire_size^2,
+    #     ),
+    #     pch = 21, fill = "white",
+    #     color = "#ffffff", alpha = 0.2
+    # ) +
+    # scale_size_continuous(range = c(0.5, 5)) +
+    scale_fill_viridis_c(
+        option = "magma",
+        alpha = .8,
+        name = "Estimate\n(rep. size)",
+        breaks = colticks
+    ) +
+    theme(
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(colour = "#a3a3a3"),
+        axis.text.y = element_text(colour = "#a3a3a3"),
+        text = element_text(size = 8),
+        plot.title = element_text(size = 14, face = "bold"),
+        plot.title.position = "plot",
+        plot.subtitle = element_markdown(size = 8, colour = "#363636"),
+        plot.caption = element_text(size = 8, hjust = 0),
+        plot.caption.position = "plot",
+        legend.key.width = unit(0.5, "cm"),
+        legend.position = c(.9, .85)
+    ) +
+    guides(
+        size = "none",
+    ) +
+    labs(
+        x = NULL,
+        y = NULL,
+        title = "Spatial distribution of repertoire sizes",
+        subtitle = "*Posterior conditional effects of spatial predictior. <br>
+        Points represent individual repertoire sizes (range 1-9)*"
+        # caption = "\nOther information"
+    )
+#     -> spatial_m_3
+# ggsave(
+#     filename = "spatial_m_3.jpg",
+#     plot = spatial_m_3,
+#     path = dirs$figs,
+#     scale = 1,
+#     width = 13,
+#     height = 13,
+#     units = "cm",
+#     dpi = 350,
+#     limitsize = FALSE
+# )
+```
+### Plot posterior distribution of covariance
+```{r }
+
+post <-
+    tidy_draws(m_0) %>%
+    mutate(
+        iter = 1:n(),
+        etasq = sdgp_gpxy^2,
+        rhosq = 1 / (2 * lscale_gpxy^2)
+    )
+
+
+# for `slice_sample()`
+set.seed(14)
+
+# wrangle
+
+post %>%
+    slice_sample(n = 100) %>%
+    expand(nesting(iter, etasq, rhosq),
+        x = seq(from = 0, to = 0.5, by = .01)
+    ) %>%
+    mutate(covariance = etasq * exp(-rhosq * x^2)) %>%
+    # plot
+    ggplot(aes(x = x, y = covariance)) +
+    geom_line(aes(group = iter),
+        size = 1 / 4, alpha = 1 / 2, color = "#EEDA9D"
+    ) +
+    stat_function(
+        fun = function(x) {
+            mean(post$etasq) *
+                exp(-(1 / (2 * mean(post$lscale_gpxy)^2)) * x^2)
+        },
+        color = "#DCA258", size = 1
+    ) +
+    #   scale_x_continuous("distance (thousand km)", expand = c(0, 0),
+    #                      breaks = 0:5 * 2) +
+    #   coord_cartesian(xlim = c(0, 10),
+    #                   ylim = c(0, 2)) +
+    labs(subtitle = "Gaussian process posterior")
+```
+
+$male_ring$sd
+           Estimate Est.Error       Q2.5    Q97.5
+Intercept 0.5103354 0.2802164 0.02705899 1.015696
