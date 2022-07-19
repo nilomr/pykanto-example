@@ -14,6 +14,7 @@ box::use(ggtext[element_markdown])
 box::use(tidybayes[...])
 box::use(forcats[fct_relevel])
 box::use(emmeans[...])
+box::use(patchwork[...])
 ```
 
 # Function definitions
@@ -55,7 +56,7 @@ dyad_data <- read_csv(file.path(dirs$resources, "bird_data", "dyad_dataset_2020-
 
 data <- data %>% mutate(sharing_index = shared / total_rep)
 dyad_data <- dyad_data %>% mutate(sharing_index = shared / total_rep)
-dyad_data <- dyad_data %>%  mutate(imm_status = wytham_born_1+ wytham_born_2)
+dyad_data <- dyad_data %>% mutate(imm_status = as.factor(wytham_born_1 + wytham_born_2))
 
 # filter(sampling_effort >= 15) %>% # Birds with fewer than 15 songs were not checked
 # mutate(
@@ -126,20 +127,20 @@ m_5_f <- brmsformula(repertoire_size ~ 1 +
 family = gaussian()
 )
 
-m_6_f <- brmsformula(ac_sim ~ 1 + 
-s(spatial_dist) + year_1 + (1 | mm(father_1, father_2)),
+m_6_f <- brmsformula(ac_sim ~ 1 +
+    s(spatial_dist) + year_1 + (1 | mm(father_1, father_2)),
 family = hurdle_lognormal()
 )
 
 
-m_7_f <- brmsformula(ac_sim ~ 1 + 
-s(spatial_dist, by = imm_status) + year_1 + (1 | mm(father_1, father_2)),
+m_7_f <- brmsformula(ac_sim ~ 1 +
+    s(spatial_dist, by = imm_status) + year_1 + (1 | mm(father_1, father_2)),
 family = hurdle_lognormal()
 )
 
 
 m_8_f <- brmsformula(sharing_index ~ 1 +
-    prop_immigrants + dispersal_distance*mean_dispersal +
+    prop_immigrants + dispersal_distance * mean_dispersal +
     gp(x, y, k = 15, scale = TRUE, c = 5 / 4) +
     (1 | father),
 family = gaussian()
@@ -292,11 +293,9 @@ m_7 <-
         seed = 444,
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_7"),
-        file_refit = "on_change",
+        file_refit = "never",
         control = list(adapt_delta = 0.999, max_treedepth = 15)
     )
-
-
 ```
 
 
@@ -307,7 +306,7 @@ pp_check(m_4, ndraws = 100)
 pp_check(m_6, ndraws = 100)
 pp_check(m_7, ndraws = 100)
 
-conditional_effects(m_0, effects = "prop_immigrants")
+conditional_effects(m_0)
 conditional_effects(m_4)
 conditional_effects(m_6)
 conditional_effects(m_7)
@@ -457,23 +456,40 @@ m_5 %>%
 m_6 %>%
     emmeans(~spatial_dist,
         var = "spatial_dist",
-        at = list('spatial_dist' = seq(0, 4000, 100)),
+        at = list("spatial_dist" = seq(0, 4000, 100)),
         epred = TRUE
     ) %>%
     gather_emmeans_draws() %>%
-        ggplot(aes(x = spatial_dist, y = .value)) +
-        stat_lineribbon(size = 1, color = "darkorange") +
-        scale_fill_manual(values = colorspace::lighten("darkorange", c(0.95, 0.7, 0.4))) +
-        # scale_y_continuous(labels = label_comma()) +
-        labs(
-            x = "spatial_dist", y = "Proportion shared songs",
-            subtitle = "Expected values from mu and hu parts (epred = TRUE)",
-            fill = "Credible interval"
-        ) +
-        globtheme +
+    ggplot(aes(x = spatial_dist, y = .value)) +
+    stat_lineribbon(size = 1, color = "darkorange") +
+    scale_fill_manual(values = colorspace::lighten("darkorange", c(0.95, 0.7, 0.4))) +
+    # scale_y_continuous(labels = label_comma()) +
+    labs(
+        x = "spatial_dist", y = "Proportion shared songs",
+        subtitle = "Expected values from mu and hu parts (epred = TRUE)",
+        fill = "Credible interval"
+    ) +
+    globtheme +
     theme(legend.position = "bottom")
 
-
+m_7 %>%
+    emmeans(~ spatial_dist:imm_status,
+        var = "spatial_dist:imm_status",
+        at = list("spatial_dist:imm_status" = seq(0, 1, 2)),
+        epred = TRUE
+    ) %>%
+    gather_emmeans_draws() %>%
+    ggplot(aes(x = spatial_dist, y = .value)) +
+    stat_lineribbon(size = 1, color = "darkorange") +
+    scale_fill_manual(values = colorspace::lighten("darkorange", c(0.95, 0.7, 0.4))) +
+    # scale_y_continuous(labels = label_comma()) +
+    labs(
+        x = "spatial_dist", y = "Proportion shared songs",
+        subtitle = "Expected values from mu and hu parts (epred = TRUE)",
+        fill = "Credible interval"
+    ) +
+    globtheme +
+    theme(legend.position = "bottom")
 
 m_0 |>
     emmeans(~prop_immigrants,
@@ -495,50 +511,53 @@ m_0 |>
     theme(legend.position = "bottom")
 ```
 
-
-```{r}
-# get conditional effects
-m_6_cond_effs = conditional_effects(
-  m_6,
-  effects = "spatial_dist",
-  spaghetti = T,
-  points = T,
-  ndraws = 30,
-  resolution = 20,
-  method = "fitted"
-)
-m_6_df = as.data.frame(m_6_cond_effs$spatial_dist)
-
-```
+# Plots
 
 ## Plot similarity vs distance
 
+
 ```{r}
-text_colour = "#f2f2f2"
+# get conditional effects
+m_6_cond_effs <- conditional_effects(
+    m_7,
+    effects = "spatial_dist:imm_status",
+    spaghetti = T,
+    points = T,
+    ndraws = 30,
+    resolution = 20,
+    method = "fitted"
+)
+m_6_df <- as.data.frame(m_6_cond_effs$`spatial_dist:imm_status`)
+```
 
-attr(m_6_df, "spaghetti") %>% 
- ggplot(
 
-) +
-  geom_line(  aes(
-    x = effect1__,
-    y = estimate__,
-    group = sample__
-  ),  alpha = .2, size = .4, color = '#d1466c') +
-  geom_line(
-    # smooth jagged mean line (change to geom_line
-    # to see that it has no effect otherwise)
-    data = m_6_df,
-    aes(  x = effect1__,
-    y = estimate__,),
+```{r}
+text_colour <- "#f2f2f2"
+
+attr(m_6_df, "spaghetti") %>%
+    ggplot() +
+    geom_line(aes(
+        x = effect1__,
+        y = estimate__,
+        group = sample__,
+        colour = effect2__,
+    ), alpha = .2, size = .4) +
+    geom_smooth(
+        # smooth jagged mean line (change to geom_line
+        # to see that it has no effect otherwise)
+        data = m_6_df,
+        aes(
+            x = effect1__,
+            y = estimate__,
+        ),
         alpha = 1,
-    size = 2,
-    colour= '#fdf7b7'
-  ) +
+        size = 2,
+        colour = "#159765"
+    ) +
     theme(
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        panel.border = element_rect(colour = text_colour, fill=NA, size=1),
+        panel.border = element_rect(colour = text_colour, fill = NA, size = 1),
         axis.ticks.y = element_blank(),
         axis.ticks.x = element_blank(),
         axis.text.x = element_text(colour = text_colour),
@@ -553,47 +572,219 @@ attr(m_6_df, "spaghetti") %>%
         legend.position = c(.9, .75),
         legend.background = element_rect(fill = "transparent", color = NA),
         legend.box.background = element_rect(fill = "transparent", color = NA),
-        legend.text=element_text(color=text_colour),
-        legend.title=element_text(color=text_colour),
+        legend.text = element_text(color = text_colour),
+        legend.title = element_text(color = text_colour),
+        legend.key = element_blank(),
         panel.background = element_rect(fill = "transparent", color = NA),
         plot.background = element_rect(fill = "transparent", color = NA)
     ) +
     guides(
         size = "none",
     ) +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
     labs(
         x = NULL,
         y = NULL,
         title = "Levels of postnatal dispersal across space",
         subtitle = "*Posterior conditional effects of spatial predictor*<br>"
         # caption = "\nOther information"
-    ) 
+    ) -> acsim_vs_dist
+
+
+ggsave(
+    filename = "acsim_vs_dist_m7.png",
+    plot = acsim_vs_dist,
+    path = dirs$figs,
+    scale = 1,
+    width = 13,
+    height = 13,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
 ```
+
+## Plot sharing vs immigration
+
 ```{r}
 
-spagetti_plot <- plot(
-  conditional_effects(
-    m_6,
-    effects = "spatial_dist",
-    prob = 0.89,
-    spaghetti = TRUE,
-    ndraws = 50,
-    resolution = 100,
+spagetti_epred_plot <- function(model,
+                                effects,
+                                drawcolour = "#bc4c66",
+                                meancolour = "#deb78b",
+                                text_colour = "#f2f2f2",
+                                background = "transparent",
+                                ndraws = 300,
+                                resolution = 100) {
+    model_cond_effs <- brms::conditional_effects(
+        model,
+        effects = effects,
+        spaghetti = T,
+        points = T,
+        ndraws = ndraws,
+        resolution = resolution,
+        method = "posterior_epred"
+    )
 
-  ),
-  theme = theme_bw()
+    model_df <- as.data.frame(model_cond_effs[[effects]])
+    attr(model_df, "spaghetti") %>%
+        ggplot() +
+        geom_line(aes(
+            x = effect1__,
+            y = estimate__,
+            group = sample__,
+        ),
+        alpha = .3, size = .3,
+        colour = drawcolour
+        ) +
+        geom_smooth(
+            # smooth jagged mean line (change to geom_line
+            # to see that it has no effect otherwise)
+            data = model_df,
+            aes(
+                x = effect1__,
+                y = estimate__,
+            ),
+            alpha = .8,
+            size = 1,
+            colour = meancolour
+        ) +
+        theme(
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            panel.border = element_rect(colour = text_colour, fill = NA, size = 1),
+            axis.ticks.y = element_blank(),
+            axis.ticks.x = element_blank(),
+            axis.text.x = element_text(colour = text_colour),
+            axis.text.y = element_text(colour = text_colour),
+            axis.title.y = element_text(
+                colour = text_colour,
+                margin = margin(t = 0, r = 10, b = 0, l = 0)
+            ),
+            axis.title.x = element_text(
+                colour = text_colour,
+                margin = margin(t = 10, r = 0, b = 0, l = 0)
+            ),
+            text = element_text(size = 9),
+            plot.title = element_text(size = 14, face = "bold", colour = text_colour),
+            plot.title.position = "panel",
+            plot.subtitle = ggtext::element_markdown(size = 8, colour = text_colour),
+            plot.caption = element_text(size = 8, hjust = 0),
+            plot.caption.position = "plot",
+            legend.key.width = unit(0.5, "cm"),
+            legend.position = c(.9, .75),
+            legend.background = element_rect(fill = background, color = NA),
+            legend.box.background = element_rect(fill = background, color = NA),
+            legend.text = element_text(color = text_colour),
+            legend.title = element_text(color = text_colour),
+            legend.key = element_blank(),
+            panel.background = element_rect(fill = background, color = NA),
+            plot.background = element_rect(fill = background, color = NA)
+        ) +
+        guides(
+            size = "none",
+        ) +
+        scale_x_continuous(expand = c(0, 0)) +
+        scale_y_continuous(expand = c(0, 0)) -> plot
+    return(plot)
+}
+```
+
+## Plot dyadic song-sharing vs immigration levels
+
+```{r }
+spagetti_epred_plot(m_0, "prop_immigrants",
+    drawcolour = "#d34a4a",
+    meancolour = "#deb78b", ndraws = 200,
+    resolution = 100, background = "#262626"
+) +
+    labs(
+        x = "Proportion of immigrant neighbours",
+        y = "Song Sharing Index",
+        title = "Song-sharing and immigration",
+        subtitle = "*Posterior predictive distrib. of neighbour immigration status*<br>"
+    ) -> imm_vs_sharing_m0
+
+ggsave(
+    filename = "imm_vs_sharing_m0.png",
+    plot = imm_vs_sharing_m0,
+    path = dirs$figs,
+    scale = 1,
+    width = 10,
+    height = 13,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
+```
+
+## Plot dyadic song-sharing vs dispersal
+
+```{r }
+spagetti_epred_plot(m_0, "mean_dispersal",
+    drawcolour = "#c0732c",
+    meancolour = "#deb78b", ndraws = 200,
+    resolution = 100, background = "#262626"
+) +
+    labs(
+        x = "Mean dispersal distance of neighbours",
+        y = "Song Sharing Index",
+        title = "Song-sharing and dispersal",
+        subtitle = "*Posterior predictive distrib. of dispersal distance*<br>"
+    ) -> disp_vs_sharing_m0
+
+ggsave(
+    filename = "dispersal_vs_sharing_m0.png",
+    plot = disp_vs_sharing_m0,
+    path = dirs$figs,
+    scale = 1,
+    width = 10,
+    height = 13,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
+```
+
+
+
+## Plot dyadic song-sharing vs spatial distance
+
+```{r}
+
+spagetti_epred_plot(m_7, "spatial_dist",
+    drawcolour = "#bc4c66",
+    meancolour = "#deb78b", ndraws = 200,
+    resolution = 100, background = "#262626"
+) +
+    labs(
+        x = "Distance (m)",
+        y = "Repertoire Similarity",
+        title = "Song similarity and spatial distance",
+        subtitle = "*Posterior predictive distribution of spatial distance*<br>"
+    ) -> dist_vs_sim_0_m7
+
+ggsave(
+    filename = "dist_vs_sim_0_m7.png",
+    plot = dist_vs_sim_0_m7,
+    path = dirs$figs,
+    scale = 1,
+    width = 10,
+    height = 13,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
 )
 
-# You can make subsequent aesthetic tweaks by referencing the underlying ggplot2 object
-spagetti_plot_edited <- spagetti_plot$time + 
-  # Adjust the breaks along the y axis
-  scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) +
-  # Adding Labels to the X and Y axis
-  labs(
-    y = TeX('Y | $\\alpha_{j}+\\gamma_{j}Time_{tj}\\times\\gamma_{j}Conflict_{tj}$'),
-    x = TeX("Time")
-  )
 
+# kk = dist_vs_sim_m7 + dist_vs_sim_m7 & theme(
+#     plot.background = element_rect(fill = "transparent", color = NA)
+# )
 ```
 
 ## Plot posterior estimates of main effects
@@ -663,7 +854,7 @@ ggsave(
     units = "cm",
     dpi = 300,
     limitsize = FALSE,
-    bg="transparent"
+    bg = "transparent"
 )
 ```
 
@@ -716,9 +907,15 @@ expand_rast <- function(df, axis = 0, position = "first") {
     }
     ex <- df[if (axis == 1) df$x == v else df$y == v, ]
     if (axis == 1) {
-        tobind <- tibble(x = rep(xseq, each = length(ex$y)), y = rep(ex$y, times = length(xseq)))
+        tobind <- tibble(
+            x = rep(xseq, each = length(ex$y)),
+            y = rep(ex$y, times = length(xseq))
+        )
     } else {
-        tobind <- tibble(y = rep(xseq, each = length(ex$y)), x = rep(ex$x, times = length(xseq)))
+        tobind <- tibble(
+            y = rep(xseq, each = length(ex$y)),
+            x = rep(ex$x, times = length(xseq))
+        )
     }
     tobind <- tobind %>% mutate(
         estimate = rep(ex$estimate, times = length(xseq)),
@@ -726,8 +923,6 @@ expand_rast <- function(df, axis = 0, position = "first") {
     )
     return(tobind)
 }
-
-
 ```
 
 ```{r }
@@ -778,10 +973,13 @@ masked_rast <- rast(ex_est, type = "xyz") %>%
 x_max <- max(masked_rast$estimate)
 x_min <- min(masked_rast$estimate)
 colticks <- round(seq(f = x_min, t = x_max, by = 200), digits = 0)
-text_colour = "#f2f2f2"
+text_colour <- "#f2f2f2"
 ggplot() +
     geom_raster(data = masked_rast, aes(x = x, y = y, fill = estimate)) +
-    geom_sf(data = sf::st_as_sf(perimeter), fill = NA, colour = text_colour, size = 0.3) +
+    geom_sf(
+        data = sf::st_as_sf(perimeter), fill = NA,
+        colour = text_colour, size = 0.3
+    ) +
     # geom_point(
     #     data = data, aes(
     #         x = x, y = y
@@ -796,14 +994,14 @@ ggplot() +
         name = "Estimate",
         breaks = colticks,
         guide = guide_colorbar(
-        ticks = FALSE, 
-        nbin = 1000
+            ticks = FALSE,
+            nbin = 1000
         )
     ) +
     theme(
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        panel.border = element_rect(colour = text_colour, fill=NA, size=1),
+        panel.border = element_rect(colour = text_colour, fill = NA, size = 1),
         axis.ticks.y = element_blank(),
         axis.ticks.x = element_blank(),
         axis.text.x = element_text(colour = text_colour),
@@ -818,8 +1016,8 @@ ggplot() +
         legend.position = c(.9, .75),
         legend.background = element_rect(fill = "transparent", color = NA),
         legend.box.background = element_rect(fill = "transparent", color = NA),
-        legend.text=element_text(color=text_colour),
-        legend.title=element_text(color=text_colour),
+        legend.text = element_text(color = text_colour),
+        legend.title = element_text(color = text_colour),
         panel.background = element_rect(fill = "transparent", color = NA),
         plot.background = element_rect(fill = "transparent", color = NA)
     ) +
@@ -843,7 +1041,7 @@ ggsave(
     units = "cm",
     dpi = 350,
     limitsize = FALSE,
-    bg="transparent"
+    bg = "transparent"
 )
 ```
 ### Plot posterior distribution of covariance
