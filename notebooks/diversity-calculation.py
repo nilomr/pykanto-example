@@ -5,9 +5,11 @@ from pathlib import Path
 from typing import List, Tuple
 
 import git
+import hdbscan
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy.cluster.hierarchy as shc
 import seaborn as sns
 from mpl_toolkits.axes_grid1 import ImageGrid
 from PIL import Image
@@ -16,12 +18,16 @@ from pykanto.utils.compute import with_pbar
 from pykanto.utils.paths import ProjDirs, link_project_data
 from pynndescent import NNDescent
 from scipy.spatial import distance_matrix
+from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+from sklearn.decomposition import PCA
 
 # %%
 # MDS
 from sklearn.manifold import MDS
-from sklearn.metrics import pairwise_distances
+from sklearn.metrics import pairwise_distances, silhouette_score
 from sklearn.neighbors import BallTree
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 # %%
@@ -90,11 +96,11 @@ feat_vec = pd.read_csv(vector_dir, index_col=0)
 # Remove broken bird (20211O115; something physically wrong with the poor thing)
 
 # Looking at field notes and sharing, decided to remove the following:
-# 20211W56 : same bird as 20211W51, both no ID, failed - possibly a second attempt
-# 20211W36 : same bird as 20211W37, second no ID
+# 20211W56  : same bird as 20211W51, both no ID, failed - possibly a second attempt
+# 20211W36  : same bird as 20211W37, second no ID
 # 20211O75B : same bird as 20211O75D, no ID, failed - possibly a second attempt
-# 20211W79 : same bird as 20211W80, boxes very close so possibly same bird.
-#            W80 more amplitude so assigned to that
+# 20211W79  : same bird as 20211W80, boxes very close so possibly same bird.
+#             W80 more amplitude so assigned to that
 
 remove = ["20211O115", "20211W56", "20211W36", "20211O75B", "20211W79"]
 feat_vec = feat_vec[~feat_vec.index.str.contains("|".join(remove))]
@@ -121,6 +127,7 @@ allrings = bird_data.query(
     "father == father and repertoire_size == repertoire_size"
 ).father.tolist()
 print(f"{len(allrings) - len(set(allrings)) } were recorded in both years")
+
 
 # %%
 # Build discrete song sharing matrix (by year)
@@ -244,7 +251,7 @@ def imm_disp_rate(bird_data, coords, box_distmat):
 # the k-nearest neighbours of another bird's song
 
 # Settings
-ac_knn = 15  # How many neighbors to use for acoustic similarity
+ac_knn = 5  # How many neighbors to use for acoustic similarity
 sp_knn = 10  # How many spatial neighbors to use
 metric = "cosine"
 
@@ -798,6 +805,102 @@ median_dst[maxdist]
 
 
 # %%
+
+#%%
+# Cluster PCA
+
+
+x = StandardScaler().fit_transform(vecmed)
+
+kmeans_kwargs = {
+    "init": "random",
+    "n_init": 10,
+    "max_iter": 300,
+    "random_state": 42,
+}
+
+# A list holds the SSE values for each k
+# A list holds the silhouette coefficients for each k
+silhouette_coefficients = []
+
+maxk = 200
+# Notice you start at 2 clusters for silhouette coefficient
+for k in with_pbar(range(2, maxk)):
+    kmeans = KMeans(n_clusters=k, **kmeans_kwargs)
+    kmeans.fit(x)
+    score = silhouette_score(x, kmeans.labels_)
+    silhouette_coefficients.append(score)
+
+plt.figure(figsize=(80, 7))
+plt.style.use("dark_background")
+plt.plot(range(2, maxk), silhouette_coefficients)
+plt.xticks(range(2, maxk))
+plt.xlabel("Number of Clusters")
+plt.ylabel("Silhouette Coefficient")
+plt.show()
+
+kmeans = KMeans(n_clusters=171, **kmeans_kwargs)
+kmeans.fit(x)
+
+clust_members = pd.DataFrame(
+    np.column_stack([vecdf.index, kmeans.labels_]), columns=["bird", "cluster"]
+)
+
+
+pca = PCA(n_components=10)
+pcs = pca.fit_transform(x)
+
+clusterer = hdbscan.HDBSCAN(min_cluster_size=2, min_samples=1)
+clusterer.fit(pcs)
+print(len(set(clusterer.labels_)))
+
+clust_members = pd.DataFrame(
+    np.column_stack([vecdf.index, clusterer.labels_]),
+    columns=["bird", "cluster"],
+)
+
+for cluster in clust_members.cluster.unique():
+
+    print(clust_members.query("cluster == @cluster")["bird"].values)
+    print("\n")
+
+    print(cluster, len(clust_members.query("cluster == @cluster")))
+
+
+print(len(set(clusterer.labels_)))
+
+
+plt.figure(figsize=(10, 7))
+plt.title("Customers Dendrogram")
+
+# Selecting Annual Income and Spending Scores by index
+clusters = shc.linkage(x, method="ward", metric="euclidean")
+shc.dendrogram(Z=clusters)
+plt.show()
+
+
+principalDf = pd.DataFrame(
+    data=principalComponents,
+    columns=["principal component 1", "principal component 2"],
+)
+
+principalDf["target"] = vecdf.index
+
+
+fig = plt.figure(figsize=(8, 8))
+ax = fig.add_subplot(1, 1, 1)
+ax.set_xlabel("Principal Component 1", fontsize=15)
+ax.set_ylabel("Principal Component 2", fontsize=15)
+ax.set_title("2 component PCA", fontsize=20)
+
+
+ax.scatter(
+    principalDf.loc[:, "principal component 1"],
+    principalDf.loc[:, "principal component 2"],
+    s=10,
+)
+
+ax.grid()
 
 
 # %%
