@@ -1,6 +1,10 @@
 # Dependencies
 ```{r imports}
 
+box::use(src / dirs[dirs])
+box::use(compute = src / compute)
+box::use(plt = src / plot)
+
 box::use(brms[...])
 box::use(readr[read_csv])
 box::use(dplyr[...])
@@ -17,67 +21,188 @@ box::use(emmeans[...])
 box::use(patchwork[...])
 ```
 
-# Function definitions
-```{r}
-# Plot theme
-globtheme <- theme(
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    axis.ticks = element_blank(),
-    panel.background = element_rect(
-        fill = "#f0f0f0",
-        colour = "#f0f0f0",
-        size = 0.5,
-        linetype = "solid"
-    ),
-    axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)),
-    axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 0, l = 0))
-)
-```
 
-# Import data
-```{r directories}
-dirs <- list()
-dirs$root <- rprojroot::find_rstudio_root_file()
-dirs$resources <- file.path(dirs$root, "resources")
-dirs$figs <- file.path(dirs$root, "reports", "figures")
-dirs$data <- file.path(dirs$root, "data")
-dirs$model_fits <- file.path(dirs$data, "models", "fits")
-for (dir in dirs) {
-    if (!dir.exists(dir)) {
-        dir.create(dir, recursive = TRUE)
-    }
-}
-```
 
 ```{r import-data}
-data <- read_csv(file.path(dirs$resources, "bird_data", "full_dataset_2020-2021.csv"))
-dyad_data <- read_csv(file.path(dirs$resources, "bird_data", "dyad_dataset_2020-2021.csv"))
+data <- read_csv(file.path(
+    dirs$resources, "bird_data", "full_dataset_2020-2021.csv"
+))
+dyad_data <- read_csv(file.path(
+    dirs$resources, "bird_data", "dyad_dataset_2020-2021.csv"
+))
 
-data <- data %>% mutate(sharing_index = shared / total_rep)
-dyad_data <- dyad_data %>% mutate(sharing_index = shared / total_rep)
-dyad_data <- dyad_data %>% mutate(imm_status = as.factor(wytham_born_1 + wytham_born_2))
-
-# filter(sampling_effort >= 15) %>% # Birds with fewer than 15 songs were not checked
-# mutate(
-#     immigration = as.factor(as.integer(immigration == "imm")),
-#     year = as.factor(year),
-#     repertoire_size = as.integer(repertoire_size),
-#     sampling_effort = as.integer(sampling_effort),
-#     lay_delay = as.integer(lay_delay)
-# )
-
-print(paste("The number of distinct ID'd birds is", n_distinct(data$father)))
+data <- data %>% mutate(
+    sharing_index = shared / total_rep,
+    age = as.factor(age)
+)
+dyad_data <- dyad_data %>% mutate(
+    sharing_index = shared / total_rep,
+    imm_status = as.factor(wytham_born_1 + wytham_born_2)
+)
 ```
 
 
 # Model definitons
 
 ```{r}
-data %>% ggplot(aes(x = repertoire_size)) +
-    geom_histogram()
+data %>% ggplot(aes(x = dispersal_distance, y = repertoire_size, color = as.factor(age))) +
+    geom_boxplot() +
+    geom_jitter()
+
+data %>% ggplot(aes(x = dispersal_distance)) +
+    geom_histogram() 
 ```
 
+# Self-similarity and dispersal
+## Spatial distributiion
+
+```{r}
+selfsim_spat_f <- brmsformula(self_similarity ~ 1 + 
+gp(x, y, k = 20, scale = TRUE, c = 5 / 4),
+family = gaussian()
+)
+
+selfsim_spat_m <-
+    brm(
+        formula = selfsim_spat_f ,
+        data = data,
+        # prior = priors,
+        iter = 4000, warmup = 1000,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        backend = "cmdstanr",
+        # sample_prior = "only",
+        file = file.path(dirs$model_fits, "selfsim_spat_m"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.9999, max_treedepth = 30)
+    )
+
+```
+
+## Vs dispersal distance
+```{r}
+
+selfsim_f <- brmsformula(self_similarity ~ 1  +
+    s(dispersal_distance) + (1|father),
+family = gaussian()
+)
+
+selfsim_m <-
+    brm(
+        formula = selfsim_f,
+        data = data,
+        # prior = priors,
+        iter = 4000, warmup = 1000,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        backend = "cmdstanr",
+        # sample_prior = "only",
+        # file = file.path(dirs$model_fits, "selfsim_m"),
+        file_refit = "never",
+        control = list(adapt_delta = 0.999, max_treedepth = 20)
+    )
+
+pp_check(selfsim_m)
+conditional_effects(selfsim_m, method="posterior_epred")
+
+```
+
+
+```{r}
+
+repsize_f <- brmsformula(
+    repertoire_size | trunc(lb = 1) ~ 1 + 
+    wytham_born + (1|father),
+family = poisson()
+)
+
+repsize_m <-
+    brm(
+        formula = repsize_f ,
+        data = data,
+        # prior = priors,
+        iter = 4000, warmup = 1000,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        backend = "cmdstanr",
+        # sample_prior = "only",
+        file = file.path(dirs$model_fits, "repsize_m"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.9999, max_treedepth = 30)
+    )
+
+conditional_effects(repsize_m, method = "posterior_epred")
+
+```
+
+
+
+```{r}
+psetts <- list(
+    text.colour = "#f2f2f2",
+    background.colour = "#262626", # "transparent"
+    text.size = 10
+)
+```
+
+
+```{r}
+draw1 <- "#c0732c"
+draw2 <- "#bc4c66"
+
+postpreds = data %>%
+    filter(wytham_born == wytham_born, repertoire_size == repertoire_size) %>%
+    modelr::data_grid(wytham_born, father) %>%
+    tidybayes::add_epred_draws(repsize_m, ndraws = 40)
+
+postpreds %>%
+    ggplot(aes(x = .epred)) +
+    stat_slab(
+        data = postpreds, aes(color = wytham_born, x = .epred, group = .row),
+        alpha = .3, size = .2,
+         fill = NA
+    ) +
+    scale_colour_manual(values = c(
+        "TRUE" = draw1,
+        "FALSE" = draw2
+    )) 
+    
+```
+
+
+
+## Plot
+
+```{r}
+spagetti_epred_plot(selfsim_m, "dispersal_distance",
+    drawcolour = "#c0732c",
+    meancolour = "#deb78b", ndraws = 300,
+    resolution = 400, background = "#262626"
+) +
+    labs(
+        x = ".",
+        y = ".",
+        title = ".",
+        subtitle = "*.*<br>"
+    ) -> selfsim_m_p1
+
+ggsave(
+    filename = "selfsim_m_p1.png",
+    plot = selfsim_m_p1,
+    path = dirs$figs,
+    scale = 1,
+    width = 10,
+    height = 13,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
+
+```
 
 ```{r gp-test}
 
@@ -90,10 +215,8 @@ family = hurdle_lognormal()
 )
 
 # Density and year have no effect, removed them
-
 m_1_f <- brmsformula(sharing_index ~ 1 +
-    prop_immigrants + mean_spat_dist + (1 | father) +
-    gp(x, y, k = 10, scale = TRUE, c = 5 / 4),
+     prop_immigrants + mean_dispersal + s(x, y),
 family = hurdle_lognormal()
 )
 
@@ -135,7 +258,7 @@ family = hurdle_lognormal()
 
 m_7_f <- brmsformula(ac_sim ~ 1 +
     s(spatial_dist, by = imm_status) + year_1 + (1 | mm(father_1, father_2)),
-family = hurdle_lognormal()
+family = gaussian()
 )
 
 
@@ -146,6 +269,12 @@ m_8_f <- brmsformula(sharing_index ~ 1 +
 family = gaussian()
 )
 
+m_9_f <- brmsformula(self_similarity ~ 1 +
+    prop_immigrants + mean_dispersal + wytham_born + year + (1 | father)+
+    s(x, y) +
+    (1 | father),
+family = gaussian()
+)
 
 
 # https://www.andrewheiss.com/blog/2022/05/09/hurdle-lognormal-gaussian-brms/#2-hurdle-lognormal-model-on-a-non-exponential-outcome
@@ -164,6 +293,7 @@ m_0 <-
         chains = 4,
         cores = 4,
         seed = 444,
+        backend='cmdstanr',
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_0"),
         file_refit = "never",
@@ -175,14 +305,15 @@ m_1 <-
         formula = m_1_f,
         data = data,
         # prior = priors,
-        iter = 1500, warmup = 500,
+        iter = 3000, warmup = 500,
         chains = 4,
         cores = 4,
         seed = 444,
+        backend='cmdstanr',
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_1"),
-        file_refit = "never",
-        control = list(adapt_delta = 0.999, max_treedepth = 20)
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.9, max_treedepth = 15)
     )
 
 m_2 <-
@@ -296,17 +427,33 @@ m_7 <-
         file_refit = "never",
         control = list(adapt_delta = 0.999, max_treedepth = 15)
     )
+
+m_9 <-
+    brm(
+        formula = m_9_f,
+        data = data,
+        # prior = priors,
+        iter = 1000, warmup = 600,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_9"),
+        file_refit = "never",
+        control = list(adapt_delta = 0.99, max_treedepth = 15)
+    )
 ```
 
 
 ```{r}
 
 pp_check(m_0, ndraws = 100)
+pp_check(m_1, ndraws = 100)
 pp_check(m_4, ndraws = 100)
 pp_check(m_6, ndraws = 100)
 pp_check(m_7, ndraws = 100)
 
-conditional_effects(m_0)
+conditional_effects(m_1)
 conditional_effects(m_4)
 conditional_effects(m_6)
 conditional_effects(m_7)
@@ -640,8 +787,6 @@ spagetti_epred_plot <- function(model,
         colour = drawcolour
         ) +
         geom_smooth(
-            # smooth jagged mean line (change to geom_line
-            # to see that it has no effect otherwise)
             data = model_df,
             aes(
                 x = effect1__,
@@ -721,20 +866,20 @@ ggsave(
 )
 ```
 
-## Plot dyadic song-sharing vs dispersal
+## Plot song-sharing vs dispersal
 
 ```{r }
-spagetti_epred_plot(m_0, "mean_dispersal",
+spagetti_epred_plot(m_1, "dispersal_distance",
     drawcolour = "#c0732c",
-    meancolour = "#deb78b", ndraws = 200,
-    resolution = 100, background = "#262626"
+    meancolour = "#deb78b", ndraws = 300,
+    resolution = 400, background = "#262626"
 ) +
     labs(
         x = "Mean dispersal distance of neighbours",
         y = "Song Sharing Index",
         title = "Song-sharing and dispersal",
         subtitle = "*Posterior predictive distrib. of dispersal distance*<br>"
-    ) -> disp_vs_sharing_m0
+    ) -> disp_vs_sharing_m1
 
 ggsave(
     filename = "dispersal_vs_sharing_m0.png",
@@ -1048,7 +1193,7 @@ ggsave(
 ```{r }
 
 post <-
-    tidy_draws(m_0) %>%
+    tidy_draws(m_2) %>%
     mutate(
         iter = 1:n(),
         etasq = sdgp_gpxy^2,
@@ -1061,29 +1206,105 @@ set.seed(14)
 
 # wrangle
 
-post %>%
-    slice_sample(n = 100) %>%
+postd = post %>%
+    slice_sample(n = 150) %>%
     expand(nesting(iter, etasq, rhosq),
-        x = seq(from = 0, to = 0.5, by = .01)
+        x = seq(from = 0, to = 0.1, by = .001)
     ) %>%
-    mutate(covariance = etasq * exp(-rhosq * x^2)) %>%
+    mutate(covariance = etasq * exp(-rhosq * x^2))
+
+
+```
+
+
+```{r }
+
+
+drawcolour = "#bc4c66"
+meancolour = "#deb78b"
+text_colour = "#f2f2f2"
+background = "transparent"
+
+
+postd %>%
     # plot
     ggplot(aes(x = x, y = covariance)) +
     geom_line(aes(group = iter),
-        size = 1 / 4, alpha = 1 / 2, color = "#EEDA9D"
+                alpha = .3, size = .3,
+        colour = drawcolour
     ) +
-    stat_function(
-        fun = function(x) {
-            mean(post$etasq) *
-                exp(-(1 / (2 * mean(post$lscale_gpxy)^2)) * x^2)
-        },
-        color = "#DCA258", size = 1
-    ) +
+        geom_smooth(
+            # smooth jagged mean line (change to geom_line
+            # to see that it has no effect otherwise)
+            data = postd,
+            aes(
+                x = x,
+                y = covariance,
+            ),
+            alpha = .8,
+            size = 1,
+            colour = meancolour,
+            se=FALSE
+        ) + 
     #   scale_x_continuous("distance (thousand km)", expand = c(0, 0),
     #                      breaks = 0:5 * 2) +
-    #   coord_cartesian(xlim = c(0, 10),
-    #                   ylim = c(0, 2)) +
-    labs(subtitle = "Gaussian process posterior")
+    coord_cartesian(ylim = c(0, 1)) +
+        theme(
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            panel.border = element_rect(colour = text_colour, fill = NA, size = 1),
+            axis.ticks.y = element_blank(),
+            axis.ticks.x = element_blank(),
+            axis.text.x = element_text(colour = text_colour),
+            axis.text.y = element_text(colour = text_colour),
+            axis.title.y = element_text(
+                colour = text_colour,
+                margin = margin(t = 0, r = 10, b = 0, l = 0)
+            ),
+            axis.title.x = element_text(
+                colour = text_colour,
+                margin = margin(t = 10, r = 0, b = 0, l = 0)
+            ),
+            text = element_text(size = 9),
+            plot.title = element_text(size = 14, face = "bold", colour = text_colour),
+            plot.title.position = "panel",
+            plot.subtitle = ggtext::element_markdown(size = 8, colour = text_colour),
+            plot.caption = element_text(size = 8, hjust = 0),
+            plot.caption.position = "plot",
+            legend.key.width = unit(0.5, "cm"),
+            legend.position = c(.9, .75),
+            legend.background = element_rect(fill = background, color = NA),
+            legend.box.background = element_rect(fill = background, color = NA),
+            legend.text = element_text(color = text_colour),
+            legend.title = element_text(color = text_colour),
+            legend.key = element_blank(),
+            panel.background = element_rect(fill = background, color = NA),
+            plot.background = element_rect(fill = background, color = NA)
+        ) +
+        guides(
+            size = "none",
+        ) +
+    labs(
+        x = "Distance",
+        y = "Covariance",
+        title = "Spatial covariance of song-sharing",
+        subtitle = "*Posterior estimates from 2D GP*<br>"
+        # caption = "\nOther information"
+    ) -> spatcovar
+ggsave(
+    filename = "spatcovar.png",
+    plot = spatcovar,
+    path = dirs$figs,
+    scale = 1,
+    width = 10,
+    height = 13,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
+
+
 ```
 
 $male_ring$sd
