@@ -106,6 +106,14 @@ settheme <- function(text.size = 8, text.colour = "#262626",
             axis.ticks.y = ggplot2::element_blank(),
             axis.ticks.x = ggplot2::element_blank(),
             axis.text.x = ggplot2::element_text(colour = text.colour),
+            axis.title.x = ggplot2::element_text(
+                colour = text.colour, size = text.size,
+                margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)
+            ),
+            axis.title.y = ggplot2::element_text(
+                colour = text.colour, size = text.size,
+                margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0)
+            ),
             axis.text.y = ggplot2::element_text(colour = text.colour),
             plot.title = ggplot2::element_text(
                 size = text.size + 6, face = "bold",
@@ -120,7 +128,6 @@ settheme <- function(text.size = 8, text.colour = "#262626",
             plot.background =
                 ggplot2::element_rect(fill = back.fill, color = NA),
             legend.key.width = ggplot2::unit(0.5, "cm"),
-            legend.position = c(.9, .75),
             legend.background =
                 ggplot2::element_rect(fill = "transparent", color = NA),
             legend.box.background =
