@@ -19,6 +19,7 @@ box::use(tidybayes[...])
 box::use(forcats[fct_relevel])
 box::use(emmeans[...])
 box::use(patchwork[...])
+box::use(ggnewscale[...])
 ```
 
 
@@ -50,21 +51,21 @@ data %>% ggplot(aes(x = dispersal_distance, y = repertoire_size, color = as.fact
     geom_jitter()
 
 data %>% ggplot(aes(x = dispersal_distance)) +
-    geom_histogram() 
+    geom_histogram()
 ```
 
 # Self-similarity and dispersal
 ## Spatial distributiion
 
 ```{r}
-selfsim_spat_f <- brmsformula(self_similarity ~ 1 + 
-gp(x, y, k = 20, scale = TRUE, c = 5 / 4),
+selfsim_spat_f <- brmsformula(self_similarity ~ 1 +
+    gp(x, y, k = 20, scale = TRUE, c = 5 / 4),
 family = gaussian()
 )
 
 selfsim_spat_m <-
     brm(
-        formula = selfsim_spat_f ,
+        formula = selfsim_spat_f,
         data = data,
         # prior = priors,
         iter = 4000, warmup = 1000,
@@ -77,14 +78,13 @@ selfsim_spat_m <-
         file_refit = "on_change",
         control = list(adapt_delta = 0.9999, max_treedepth = 30)
     )
-
 ```
 
 ## Vs dispersal distance
 ```{r}
 
-selfsim_f <- brmsformula(self_similarity ~ 1  +
-    s(dispersal_distance) + (1|father),
+selfsim_f <- brmsformula(self_similarity ~ 1 +
+    s(dispersal_distance) + (1 | father),
 family = gaussian()
 )
 
@@ -105,22 +105,22 @@ selfsim_m <-
     )
 
 pp_check(selfsim_m)
-conditional_effects(selfsim_m, method="posterior_epred")
-
+conditional_effects(selfsim_m, method = "posterior_epred")
 ```
 
-
+# Repertoire size: residents vs immigrants
+## Model
 ```{r}
 
 repsize_f <- brmsformula(
-    repertoire_size | trunc(lb = 1) ~ 1 + 
-    wytham_born + (1|father),
-family = poisson()
+    repertoire_size ~ 1 +
+        wytham_born + (1 | father),
+    family = poisson()
 )
 
 repsize_m <-
     brm(
-        formula = repsize_f ,
+        formula = repsize_f,
         data = data,
         # prior = priors,
         iter = 4000, warmup = 1000,
@@ -133,44 +133,237 @@ repsize_m <-
         file_refit = "on_change",
         control = list(adapt_delta = 0.9999, max_treedepth = 30)
     )
-
-conditional_effects(repsize_m, method = "posterior_epred")
-
 ```
 
-
-
+## Plot
 ```{r}
 psetts <- list(
     text.colour = "#f2f2f2",
     background.colour = "#262626", # "transparent"
-    text.size = 10
+    text.size = 12,
+    draw1 = "#c77426",
+    draw2 = "#ad3b56",
+    draw3 = "#5ca5b8"
 )
+
+labelcol <- c(psetts$draw1, psetts$draw2)
 ```
 
 
 ```{r}
-draw1 <- "#c0732c"
-draw2 <- "#bc4c66"
 
-postpreds = data %>%
+postpreds <- data %>%
     filter(wytham_born == wytham_born, repertoire_size == repertoire_size) %>%
     modelr::data_grid(wytham_born, father) %>%
-    tidybayes::add_epred_draws(repsize_m, ndraws = 40)
+    tidybayes::add_epred_draws(repsize_m, ndraws = 20)
 
 postpreds %>%
     ggplot(aes(x = .epred)) +
+    stat_pointinterval(
+        data = postpreds, aes(color = wytham_born, x = .epred),
+        point_size = 1.5, point_alpha = .5, interval_alpha = NA,
+        interval_size = NA, fill = NA
+    ) +
     stat_slab(
         data = postpreds, aes(color = wytham_born, x = .epred, group = .row),
-        alpha = .3, size = .2,
-         fill = NA
+        alpha = .4, size = .2, scale = 1, fill = NA
     ) +
-    scale_colour_manual(values = c(
-        "TRUE" = draw1,
-        "FALSE" = draw2
-    )) 
-    
+    scale_colour_manual(
+        name = "",
+        labels = paste(
+            "<span style='font-weight: bold !important; color:",
+            labelcol,
+            "'>",
+            c("Immigrant", "Resident"),
+            "</span>"
+        ),
+        values = labelcol
+    ) +
+    plt$settheme(
+        back.fill = psetts$background.colour,
+        text.size = psetts$text.size,
+        text.colour = psetts$text.colour
+    ) +
+    guides(
+        size = "none",
+        color = guide_legend(override.aes = list(linetype = 0), reverse = TRUE)
+    ) +
+    theme(
+        legend.key = element_rect(colour = NA, fill = NA),
+        legend.box.background = element_blank(),
+        legend.text = ggtext::element_markdown(size = 14),
+        legend.position = c(.8, .8),
+        axis.title.x.bottom = ggtext::element_markdown(
+            colour = psetts$text.colour, size = psetts$text.size,
+            margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)
+        )
+    ) +
+    coord_cartesian(xlim = c(2, 4), ylim = c(0, 1)) +
+    labs(
+        x = paste0(
+            "Repertoire size <br>",
+            "<span style='font-weight: bold !important; color:#9e9e9e'>",
+            "(posterior predicted mean)</span>"
+        ),
+        y = "Density",
+        title = "Northness! Northness!",
+        subtitle = "*A suitable subtitle*<br>"
+    ) -> repsize_m_plot
+
+ggsave(
+    filename = "repsize_m_plot.png",
+    plot = repsize_m_plot,
+    path = dirs$figs,
+    scale = 1,
+    width = 13,
+    height = 10,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
 ```
+
+
+# Acoustic similarity with neighbours: residents vs immigrants
+## Model
+```{r}
+
+data %>% ggplot(aes(x = prop_immigrants, y = mean_ac_sim, colour = wytham_born)) +
+    geom_smooth() +
+    geom_point()
+acsim_neighbours_f <- brmsformula(
+    mean_ac_sim ~ 1 +
+        wytham_born * prop_immigrants + year + (1 | father),
+    family = gaussian()
+)
+
+brms::hypothesis(acsim_neighbours_m, "wytham_bornTRUE:prop_immigrants < 0", robust = TRUE)
+parnames(acsim_neighbours_m)
+acsim_neighbours_m <-
+    brm(
+        formula = acsim_neighbours_f,
+        data = data,
+        # prior = priors,
+        iter = 4000, warmup = 1000,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        backend = "cmdstanr",
+        # sample_prior = "only",
+        file = file.path(dirs$model_fits, "acsim_neighbours_m"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.9999, max_treedepth = 30)
+    )
+```
+
+## Plot
+
+```{r}
+
+
+acsim_neighbours_cond_effs <- brms::conditional_effects(
+    acsim_neighbours_m,
+    effects = peffect,
+    spaghetti = T,
+    points = T,
+    ndraws = 400,
+    resolution = 300,
+    method = "posterior_epred"
+)
+
+acsim_neighbours_df <- as.data.frame(acsim_neighbours_cond_effs[[peffect]]) %>%
+    attr("spaghetti") %>%
+    tibble::as_tibble()
+
+acsim_neighbours_df %>%
+    ggplot(
+        aes(
+            x = effect1__,
+            y = estimate__,
+            group = sample__,
+            colour = effect2__
+        )
+    ) +
+    geom_line(alpha = .1, size = .5) +
+    scale_colour_manual(
+        name = "",
+        labels = paste(
+            "<span style='font-weight: bold !important; color:",
+            labelcol,
+            "'>",
+            c("Immigrant", "Resident"),
+            "</span>"
+        ),
+        values = labelcol
+    ) +
+    ggnewscale::new_scale_colour() +
+    geom_smooth(
+        data = acsim_neighbours_df,
+        aes(
+            x = effect1__,
+            y = estimate__,
+            group = effect2__,
+            color = effect2__
+        ),
+        method = "lm",
+        alpha = .5,
+        size = 1.5,
+        se = FALSE
+    ) +
+    scale_colour_manual(
+        name = "kk", labels = c("Immigrant", "Resident"),
+        values = c("black", "white")
+    ) +
+    plt$settheme(
+        back.fill = psetts$background.colour,
+        text.size = psetts$text.size,
+        text.colour = psetts$text.colour
+    ) +
+    # guides(
+    #     size = "none",
+    #     color = guide_legend(
+    #         override.aes = list(linetype = 0),
+    #         reverse = FALSE
+    #     )
+    # ) +
+    theme(
+        legend.key = element_rect(fill = NA),
+        legend.box.background = element_blank(),
+        legend.text = ggtext::element_markdown(size = 14),
+        legend.position = c(.8, .8),
+        axis.title.x.bottom = ggtext::element_markdown(
+            colour = psetts$text.colour, size = psetts$text.size,
+            margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)
+        )
+    ) +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    # coord_cartesian(xlim = c(2, 4), ylim = c(0, 1)) +
+    labs(
+        x = "Proportion of neighbour immigrants",
+        y = "Song similarity with neighbours",
+        title = "Northness! Northness!",
+        subtitle = "*A suitable subtitle*<br>"
+    ) # -> acsim_neighbours_plot
+
+
+ggsave(
+    filename = "acsim_neighbours_plot.png",
+    plot = acsim_neighbours_plot,
+    path = dirs$figs,
+    scale = 1,
+    width = 13,
+    height = 10,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
+
+repsize_m_plot
+```
+
 
 
 
@@ -201,7 +394,6 @@ ggsave(
     limitsize = FALSE,
     bg = "transparent"
 )
-
 ```
 
 ```{r gp-test}
@@ -216,7 +408,7 @@ family = hurdle_lognormal()
 
 # Density and year have no effect, removed them
 m_1_f <- brmsformula(sharing_index ~ 1 +
-     prop_immigrants + mean_dispersal + s(x, y),
+    prop_immigrants + mean_dispersal + s(x, y),
 family = hurdle_lognormal()
 )
 
@@ -270,7 +462,7 @@ family = gaussian()
 )
 
 m_9_f <- brmsformula(self_similarity ~ 1 +
-    prop_immigrants + mean_dispersal + wytham_born + year + (1 | father)+
+    prop_immigrants + mean_dispersal + wytham_born + year + (1 | father) +
     s(x, y) +
     (1 | father),
 family = gaussian()
@@ -293,7 +485,7 @@ m_0 <-
         chains = 4,
         cores = 4,
         seed = 444,
-        backend='cmdstanr',
+        backend = "cmdstanr",
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_0"),
         file_refit = "never",
@@ -309,7 +501,7 @@ m_1 <-
         chains = 4,
         cores = 4,
         seed = 444,
-        backend='cmdstanr',
+        backend = "cmdstanr",
         sample_prior = FALSE,
         file = file.path(dirs$model_fits, "m_1"),
         file_refit = "on_change",
@@ -1206,84 +1398,82 @@ set.seed(14)
 
 # wrangle
 
-postd = post %>%
+postd <- post %>%
     slice_sample(n = 150) %>%
     expand(nesting(iter, etasq, rhosq),
         x = seq(from = 0, to = 0.1, by = .001)
     ) %>%
     mutate(covariance = etasq * exp(-rhosq * x^2))
-
-
 ```
 
 
 ```{r }
 
 
-drawcolour = "#bc4c66"
-meancolour = "#deb78b"
-text_colour = "#f2f2f2"
-background = "transparent"
+drawcolour <- "#bc4c66"
+meancolour <- "#deb78b"
+text_colour <- "#f2f2f2"
+background <- "transparent"
 
 
 postd %>%
     # plot
     ggplot(aes(x = x, y = covariance)) +
     geom_line(aes(group = iter),
-                alpha = .3, size = .3,
+        alpha = .3, size = .3,
         colour = drawcolour
     ) +
-        geom_smooth(
-            # smooth jagged mean line (change to geom_line
-            # to see that it has no effect otherwise)
-            data = postd,
-            aes(
-                x = x,
-                y = covariance,
-            ),
-            alpha = .8,
-            size = 1,
-            colour = meancolour,
-            se=FALSE
-        ) + 
+    geom_smooth(
+        # smooth jagged mean line (change to geom_line
+        # to see that it has no effect otherwise)
+        data = postd,
+        aes(
+            x = x,
+            y = covariance,
+        ),
+        alpha = .8,
+        size = 1,
+        colour = meancolour,
+        se = FALSE
+    ) +
     #   scale_x_continuous("distance (thousand km)", expand = c(0, 0),
     #                      breaks = 0:5 * 2) +
     coord_cartesian(ylim = c(0, 1)) +
-        theme(
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank(),
-            panel.border = element_rect(colour = text_colour, fill = NA, size = 1),
-            axis.ticks.y = element_blank(),
-            axis.ticks.x = element_blank(),
-            axis.text.x = element_text(colour = text_colour),
-            axis.text.y = element_text(colour = text_colour),
-            axis.title.y = element_text(
-                colour = text_colour,
-                margin = margin(t = 0, r = 10, b = 0, l = 0)
-            ),
-            axis.title.x = element_text(
-                colour = text_colour,
-                margin = margin(t = 10, r = 0, b = 0, l = 0)
-            ),
-            text = element_text(size = 9),
-            plot.title = element_text(size = 14, face = "bold", colour = text_colour),
-            plot.title.position = "panel",
-            plot.subtitle = ggtext::element_markdown(size = 8, colour = text_colour),
-            plot.caption = element_text(size = 8, hjust = 0),
-            plot.caption.position = "plot",
-            legend.key.width = unit(0.5, "cm"),
-            legend.position = c(.9, .75),
-            legend.background = element_rect(fill = background, color = NA),
-            legend.box.background = element_rect(fill = background, color = NA),
-            legend.text = element_text(color = text_colour),
-            legend.title = element_text(color = text_colour),
-            legend.key = element_blank(),
-            panel.background = element_rect(fill = background, color = NA),
-            plot.background = element_rect(fill = background, color = NA)
-        ) +
-        guides(
-            size = "none",
-        ) +
+    theme(
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour = text_colour, fill = NA, size = 1),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(colour = text_colour),
+        axis.text.y = element_text(colour = text_colour),
+        axis.title.y = element_text(
+            colour = text_colour,
+            margin = margin(t = 0, r = 10, b = 0, l = 0)
+        ),
+        axis.title.x = element_text(
+            colour = text_colour,
+            margin = margin(t = 10, r = 0, b = 0, l = 0)
+        ),
+        text = element_text(size = 9),
+        plot.title = element_text(size = 14, face = "bold", colour = text_colour),
+        plot.title.position = "panel",
+        plot.subtitle = ggtext::element_markdown(size = 8, colour = text_colour),
+        plot.caption = element_text(size = 8, hjust = 0),
+        plot.caption.position = "plot",
+        legend.key.width = unit(0.5, "cm"),
+        legend.position = c(.9, .75),
+        legend.background = element_rect(fill = background, color = NA),
+        legend.box.background = element_rect(fill = background, color = NA),
+        legend.text = element_text(color = text_colour),
+        legend.title = element_text(color = text_colour),
+        legend.key = element_blank(),
+        panel.background = element_rect(fill = background, color = NA),
+        plot.background = element_rect(fill = background, color = NA)
+    ) +
+    guides(
+        size = "none",
+    ) +
     labs(
         x = "Distance",
         y = "Covariance",
@@ -1303,8 +1493,6 @@ ggsave(
     limitsize = FALSE,
     bg = "transparent"
 )
-
-
 ```
 
 $male_ring$sd
