@@ -50,7 +50,7 @@ data = pd.read_csv(
 # ──── MAIN ─────────────────────────────────────────────────────────────────────
 
 # Get subset for each song type
-nsamples = 5
+nsamples = 10
 dsubset = (
     data[data.class_label != "-1"]
     .groupby(["ID", "class_label"])
