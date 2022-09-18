@@ -49,35 +49,23 @@ data = pd.read_csv(
 
 # ──── MAIN ─────────────────────────────────────────────────────────────────────
 
-# Calculate inter onset interval and get average per songid.
-
-data["songid"] = data.ID + "_" + data.class_label
-data["ioi"] = [(np.append(r[1:], 0) - r)[:-1] for r in data.onsets]
-
-data.loc[data.songid == "B1191", "onsets"].values
-
-dflist = []
-drop = 0
-for ID in with_pbar(data.songid.unique()):
-    if "-" in ID:
-        continue
-    v = data.loc[data.songid == ID, "ioi"].values
-    if len(v) > 5:
-        v = [ioi for ioi in v if len(ioi) > 3]
-        if len(v) > 5:
-            dflist.append([[ID, a[:3]] for a in v][:5])
-        else:
-            drop += 1
-    else:
-        drop += 1
-        continue
-print(f"Dropped {drop} songs due to insufficient sample size")
-
-
-pdf = pd.DataFrame(
-    [item for sublist in dflist for item in sublist], columns=["songid", "iois"]
+# Get subset for each song type
+nsamples = 5
+dsubset = (
+    data[data.class_label != "-1"]
+    .groupby(["ID", "class_label"])
+    .filter(lambda x: len(x) > nsamples)
+    .groupby(["ID", "class_label"])
+    .sample(nsamples, random_state=123)
 )
-pdf["ratios"] = [iois[:-1] / iois[1:] for iois in pdf.iois.values]
+
+# Calculate inter onset intervals and ratios.
+dsubset["songid"] = dsubset.ID + "_" + dsubset.class_label
+dsubset["iois"] = [(np.append(r[1:], 0) - r)[:-1] for r in dsubset.onsets]
+dsubset["ratios"] = [iois[:-1] / iois[1:] for iois in dsubset.iois.values]
+dsubset["iois"] = [l[:3] for l in dsubset.iois]
+dsubset["ratios"] = [l[:3] for l in dsubset.ratios]
+dsubset = dsubset[["songid", "ratios", "iois"]]
 
 
 # ──── EXPORT DATAFRAME ─────────────────────────────────────────────────────────
@@ -85,38 +73,24 @@ pdf["ratios"] = [iois[:-1] / iois[1:] for iois in pdf.iois.values]
 # (plotting will be done in R)
 
 pdf = (
-    pdf.join(
+    dsubset.join(
         pd.DataFrame(
-            pdf["iois"].to_list(),
+            dsubset["iois"].to_list(),
             columns=["ioi_1", "ioi_2", "ioi_3"],
-            index=pdf.index,
+            index=dsubset.index,
         )
     )
     .join(
         pd.DataFrame(
-            pdf["ratios"].to_list(),
-            columns=["ratio_1", "ratio_2"],
-            index=pdf.index,
+            dsubset["ratios"].to_list(),
+            columns=["ratio_1", "ratio_2", "ratio_3"],
+            index=dsubset.index,
         )
     )
     .drop(["iois", "ratios"], axis=1)
-)
+).dropna(subset=["ioi_1", "ioi_2", "ioi_3"])
 
 pdf.to_csv(makedir(DIRS.DATA / "derived") / "interval_ratios.csv", index=False)
-
-pdf = pd.merge(
-    pdf,
-    pd.DataFrame(pdf["iois"].values.tolist()).add_prefix("ioi_"),
-    on=pdf.songid,
-).drop("key_0", axis=1)
-
-pdf = pd.merge(
-    pdf,
-    pd.DataFrame(pdf["ratios"].values.tolist()).add_prefix("ratio_"),
-    on=pdf.songid,
-).drop("key_0", axis=1)
-
-df.to_csv(makedir(DIRS.DATA / "derived") / "interval_ratios.csv", index=False)
 
 
 # iois = np.mean(np.stack([a[:4] for a in v]), axis=0)
