@@ -1,0 +1,349 @@
+# Dependencies
+```{r imports}
+
+box::use(src / dirs[dirs])
+box::use(compute = src / compute)
+box::use(plt = src / plot)
+box::use(brms[...])
+box::use(readr[read_csv])
+box::use(dplyr[...])
+box::use(tidyr[spread, separate, gather, expand, nesting])
+box::use(ggplot2[...])
+box::use(scales[...])
+box::use(terra)
+box::use(sf)
+box::use(geosphere[perimeter])
+box::use(plyr[round_any])
+box::use(ggtext[element_markdown])
+box::use(tidybayes[...])
+box::use(forcats[fct_relevel])
+box::use(emmeans[...])
+box::use(patchwork[...])
+box::use(ggnewscale[...])
+```
+
+# Import data
+```{r import-data}
+data <- read_csv(file.path(
+    dirs$resources, "bird_data", "full_dataset_2020-2021.csv"
+))
+dyad_data <- read_csv(file.path(
+    dirs$resources, "bird_data", "dyad_dataset_2020-2021.csv"
+))
+
+data <- data %>% mutate(
+    sharing_index = shared / total_rep,
+    age = as.factor(age)
+)
+dyad_data <- dyad_data %>% mutate(
+    sharing_index = shared / total_rep,
+    imm_status = as.factor(wytham_born_1 + wytham_born_2)
+)
+
+# Woodland contour (with gaps)
+perimeter <- terra::vect(file.path(
+    dirs$resources, "ww_contour", "wytham_perimeter.shp"
+))
+terra::crs(perimeter) <- "epsg:27700"
+```
+
+# Model fitting
+## Definitions
+
+```{r}
+# Spatial distribution of level of song-sharing
+spat_sim_w_neighbours_f <- brmsformula(mean_ac_sim ~ 1 +
+    gp(x, y, k = 20, scale = TRUE, c = 5 / 4),
+family = gaussian()
+)
+# Dyadic repertoire similarity vs distance
+dist_sim_pairwise_f <- brmsformula(ac_sim ~ 1 +
+    s(spatial_dist, by = imm_status) + year_1 + (1 | mm(father_1, father_2)),
+family = gaussian()
+)
+
+# year_1 + (1 | mm(father_1, father_2))
+```
+
+## Fit
+
+```{r}
+spat_sim_w_neighbours_m <-
+    brm(
+        formula = spat_sim_w_neighbours_f,
+        data = data,
+        # prior = priors,
+        iter = 2000, warmup = 500,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "spat_sim_w_neighbours_m"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.999, max_treedepth = 20)
+    )
+
+dist_sim_pairwise_m <-
+    brm(
+        formula = dist_sim_pairwise_f,
+        data = dyad_data,
+        # prior = priors,
+        iter = 2000, warmup = 500,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        sample_prior = FALSE,
+        file = file.path(dirs$model_fits, "m_7"),
+        file_refit = "never",
+        control = list(adapt_delta = 0.99, max_treedepth = 15)
+    )
+```
+
+
+# Diagnostics and checks
+```{r}
+brms::hypothesis(dist_sim_pairwise_m, "spatial_dist < 0", robust = TRUE)
+conditional_effects(m_7)
+```
+
+
+# Plot model outcomes
+
+```{r plot-settings}
+# Plot settings
+
+psetts <- list(
+    text.colour = "#f2f2f2",
+    background.colour = "#262626", # "transparent"
+    text.size = 12,
+    draw1 = "#c77426",
+    draw2 = "#c55077",
+    draw3 = "#5ca5b8",
+    mean = '#db973f'
+)
+```
+
+
+## Plot: spatial distribution with similarity with neighbours
+
+### Get estimates from fitted model
+
+```{r}
+# 1. Extract conditional effects
+# Build and tweak your plot with low resolution (<100),
+# then increase before you export the final version (~500)
+spat_sim_w_neighbours_df <- compute$spat_condeffs(
+    spat_sim_w_neighbours_m,
+    varnames = "x:y",
+    resolution = 500,
+    ndraws = 500
+)
+
+# 2. Expand and mask
+spat_sim_w_neighbours_expdf <- plt$expand_rast(spat_sim_w_neighbours_df)
+
+masked_rast <- terra::rast(spat_sim_w_neighbours_expdf, type = "xyz") %>%
+    terra::mask(., perimeter) %>%
+    terra::as.data.frame(xy = TRUE) %>%
+    tibble::as_tibble()
+```
+
+
+### Plot estimates
+```{r }
+
+#' @param plot_type One of ('estimate', 'se')
+plot_type <- "estimate"
+
+ggplot2::ggplot() +
+    ggplot2::geom_raster(
+        data = masked_rast, aes(x = x, y = y, fill = !!sym(plot_type))
+    ) +
+    ggplot2::geom_sf(
+        data = sf::st_as_sf(perimeter), fill = NA,
+        size = 0.3,
+        colour = psetts$text.colour
+    ) +
+    colorspace::scale_fill_continuous_sequential(
+        palette = "Lajolla",
+        rev = T,
+        cmax = 98,
+        n_interp = 30,
+        name = "Estimate\n",
+        breaks = plt$plot_ticks(plot_type, masked_rast, 3),
+        limits = c(
+            min(masked_rast[[plot_type]]),
+            max(masked_rast[[plot_type]]) + 0.002
+        ),
+        guide = guide_colorbar(
+            ticks = FALSE,
+            frame.colour = psetts$text.colour,
+            frame.linewidth = 1,
+            nbin = 1000
+        )
+    ) +
+    plt$settheme(
+        text.size = psetts$text.size,
+        text.colour = psetts$text.colour,
+        back.fill = psetts$background.colour
+    ) +
+    labs(
+        x = "Easting",
+        y = "Northing",
+        title = "Levels of cultural similarity\nwith neighbours",
+        subtitle = "Posterior conditional effects (gaussian process)<br>"
+    ) +
+    theme(
+        plot.title = element_text(
+            size = psetts$text.size + 2,
+            colour = psetts$text.colour, face = "bold"
+        ),
+        plot.subtitle = ggtext::element_markdown(
+            size = psetts$text.size, face = "italic"
+        ),
+        legend.key = element_rect(fill = NA),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size = psetts$text.size - 3),
+        legend.title = element_text(size = psetts$text.size - 3),
+        legend.justification = c(1, 1),
+        legend.position = c(.98, .98),
+        legend.key.width = ggplot2::unit(0.5, "cm"),
+        legend.key.height = ggplot2::unit(0.5, "cm"),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        plot.margin = unit(c(.8, .8, .8, .8), "cm"),
+        plot.background =
+            ggplot2::element_rect(fill = psetts$background.colour)
+    ) -> spat_sim_w_neighbours_plot
+```
+
+```{r }
+# Save
+ggsave(
+    filename = "spat_sim_w_neighbours_plot.png",
+    plot = spat_sim_w_neighbours_plot,
+    path = dirs$figs,
+    scale = 1,
+    width = 13,
+    height = 13,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
+```
+
+
+## Plot: pairwise repertoire similarity vs spatial distance
+
+```{r}
+
+peffect <- "spatial_dist"
+dist_sim_pairwise_cond_effs <- brms::conditional_effects(
+    dist_sim_pairwise_m,
+    effects = peffect,
+    spaghetti = T,
+    points = T,
+    ndraws = 150,
+    resolution = 300,
+    method = "posterior_epred"
+)
+
+dist_sim_pairwise_df <- as.data.frame(dist_sim_pairwise_cond_effs[[peffect]]) %>%
+    attr("spaghetti") %>%
+    tibble::as_tibble()
+
+dist_sim_pairwise_df %>%
+    ggplot(
+        aes(
+            x = effect1__,
+            y = estimate__
+        )
+    ) +
+    geom_line(aes(
+            x = effect1__,
+            y = estimate__,
+            group = sample__,
+        ),
+        alpha = .5, size = .2,
+        colour = psetts$draw2
+        ) +
+    geom_smooth(
+        data = dist_sim_pairwise_df,
+        aes(
+            x = effect1__,
+            y = estimate__
+        ),
+        method = "gam",
+        alpha = .5,
+        size = 0.8,
+        se = FALSE,
+        show.legend = FALSE,
+        colour = psetts$mean
+    ) +
+    guides(
+        size = "none",
+        color = guide_legend(
+            override.aes = list(linetype = 0),
+            reverse = FALSE
+        )
+    ) +
+    plt$settheme(
+        back.fill = psetts$background.colour,
+        text.size = psetts$text.size,
+        text.colour = psetts$text.colour
+    ) +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    labs(
+        x = "Distance (m)",
+        y = "Pairwise song similarity",
+        title = "Spatial distance\nand cultural similarity",
+        subtitle = "Posterior predictive distribution<br>"
+    ) +
+    theme(
+        aspect.ratio=4/3,
+        plot.title = element_text(
+            size = psetts$text.size + 2, colour = psetts$text.colour, face = "bold"
+        ),
+        plot.subtitle = ggtext::element_markdown(
+            size = psetts$text.size, face = "italic"
+        ),
+        legend.key = element_rect(fill = NA),
+        legend.box.background = element_blank(),
+        legend.text = ggtext::element_markdown(size = 14),
+        legend.position = c(.8, .8),
+        axis.title.x.bottom = ggtext::element_markdown(
+            colour = psetts$text.colour, size = psetts$text.size,
+            margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)
+        )
+    ) -> pairwise_dist_plot
+
+
+```
+
+
+## Combine and save
+```{r}
+spatplots <- spat_sim_w_neighbours_plot + pairwise_dist_plot &
+    theme(
+        plot.background =
+            ggplot2::element_rect(fill = psetts$background.colour),
+    )
+
+# Save combined
+ggsave(
+    filename = "spatplots.png",
+    plot = spatplots,
+    path = dirs$figs,
+    scale = 1,
+    width = 24,
+    height = 14,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
+```
