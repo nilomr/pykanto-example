@@ -4,6 +4,7 @@ box::use(compute = src / compute)
 box::use(plt = src / plot)
 box::use(readr[read_csv])
 box::use(ggplot2[...])
+box::use(ggtext[...])
 box::use(ggtern[...])
 box::use(magrittr[`%>%`])
 box::use(matrixStats[colMedians])
@@ -20,19 +21,21 @@ data <- read_csv(file.path(
 # Actual interval times
 colnames <- c("name", "ioi_1", "ioi_2", "ioi_3")
 ratios <- data.frame(
-    c(111, 323, 232, 212, 121),
-    c(1, 3, 2, 2, 1),
-    c(1, 2, 3, 1, 2),
-    c(1, 3, 2, 2, 1)
+    c(111, 212, 121),
+    c(1, 2, 1),
+    c(1, 1, 2),
+    c(1, 2, 1)
 )
 colnames(ratios) <- colnames
-
 
 # df.mu <- as.data.frame(t(colMedians(as.matrix(data[colnames]))))
 # colnames(df.mu) <- c(colnames)
 
 breaks <- seq(0, 1, by = 0.25)
 labs <- as.character(fractions(seq(0, 1, by = 0.25)))
+background = "#262626"
+text_colour <- "#f2f2f2"
+textsize <- 18
 
 data %>%
     ggtern(aes(x = ioi_1, y = ioi_3, z = ioi_2)) +
@@ -41,14 +44,11 @@ data %>%
         aes(
             fill = ..level..
         ),
-        binwidth = 0.1
+        binwidth = 3
     ) +
-    theme_hidegrid() +
-    theme_arrowlarge() +
-    theme_clockwise() +
-    scale_T_continuous(limits = c(.15, .7), breaks = breaks, labels = labs) +
-    scale_L_continuous(limits = c(.15, .7), breaks = breaks, labels = labs) +
-    scale_R_continuous(limits = c(.15, .7), breaks = breaks, labels = labs) +
+    # scale_T_continuous(limits = c(.1, .8), breaks = breaks, labels = breaks) +
+    # scale_L_continuous(limits = c(.1, .8), breaks = breaks, labels = breaks) +
+    # scale_R_continuous(limits = c(.1, .8), breaks = breaks, labels = breaks) +
     scale_fill_viridis_c(
         option = "magma",
         alpha = 1,
@@ -56,19 +56,76 @@ data %>%
         # breaks = colticks,
         guide = guide_colorbar(
             ticks = FALSE,
-            nbin = 1000
+            nbin = 80
         )
     ) +
-    geom_point(size = 0.1, color = "#ffffff", alpha = 0.1) +
+    geom_point(size = 0.1, color = "#ffffff", alpha = 0.05) +
     geom_point(
         data = ratios,
-        shape = 3, size = 5, color = "#ffffff", stroke = 1, alpha = 1
+        shape = 3, size = 6, color = "#ffffff", stroke = 1, alpha = 1
     ) +
     geom_text(
         data = ratios, label = ratios$name, hjust = 0,
-        vjust = -1, color = "#ffffff"
+        vjust = -1, color = "#ffffff", size = textsize - 13
     ) +
-    theme(panel.background = element_rect(fill = "#000000"))
+    labs(
+        title = "Ternary rythm space",
+        subtitle = "Kernel Density Estimate of interval ratios",
+        x = "",
+        xarrow = "1st IOI",
+        y = "",
+        yarrow = "3rd IOI",
+        z = "",
+        zarrow = "2nd IOI"
+    ) +
+    theme_hidegrid() +
+    theme_arrowlarge() +
+    theme_hidelabels() +
+    theme_arrowsmall() +
+    # theme_clockwise() +
+    theme(
+        legend.text = element_text(size = textsize),
+        legend.title = element_text(size = textsize),
+        panel.background = element_rect(fill = "#000000"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "none",
+        plot.title.position = "panel",
+        panel.border = element_rect(colour = text_colour, fill = NA, size = 1),
+        text = element_text(size = textsize),
+        plot.title = element_text(
+            size = textsize + 10, face = "bold", colour = text_colour,
+            hjust = 0.5, vjust = -3
+        ),
+        plot.subtitle = element_text(
+            size = textsize + 3, colour = text_colour, face = "italic",
+            hjust = 0.5, vjust = -4
+        ),
+        tern.axis.arrow = element_line(size = 2, color = text_colour),
+        tern.axis.arrow.text = ggtext::element_markdown(
+            size = textsize - 2, vjust = -1.5, colour = text_colour
+        ),
+        tern.axis.arrow.text.R = ggtext::element_markdown(
+            size = textsize - 2, vjust = 2, colour = text_colour
+        ),
+        plot.background = element_rect(fill = background, color = NA),
+        plot.margin = margin(1, 1, 1, 1, "cm")
+    ) -> rythmplot
+
+# rythmplot
+
+ggsave(
+    rythmplot,
+    path = dirs$figs,
+    filename = "ternary_rythm.png",
+    width = 22,
+    height = 22,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
+
 
 data %>%
     ggplot(aes(x = ratio_2, y = ratio_1)) +
