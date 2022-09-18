@@ -33,11 +33,15 @@ project_root = Path(
 )
 data_path = project_root / "data" / "datasets" / DATASET_ID
 segmented_dir = project_root / "data" / "segmented"
+
+# Create symlink from project to data if it doesn't exist already:
+DATA_LOCATION = Path("/media/nilomr/My Passport/SONGDATA/wytham-great-tit")
+link_project_data(DATA_LOCATION, project_root / "data")
+
 DIRS = ProjDirs(project_root, segmented_dir, DATASET_ID, mkdir=False)
 
-
+# Load existing dataset
 out_dir = DIRS.DATA / "datasets" / DATASET_ID / f"{DATASET_ID}.db"
-
 dataset = load_dataset(out_dir, DIRS, relink_data=True)
 dataset.files.average_units[0]
 
@@ -67,7 +71,7 @@ def get_peak_freq(
 
 
 # Get subset for each song type
-nsamples = 10
+nsamples = 5
 dsubset = (
     dataset.data[dataset.data.class_label != "-1"]
     .groupby(["ID", "class_label"])
@@ -78,7 +82,7 @@ dsubset = (
 dsubset["songid"] = dsubset.ID + "_" + dsubset.class_label
 
 dflist = []
-for idx in with_pbar(np.unique(dsubset.songid)[:2]):
+for idx in with_pbar(np.unique(dsubset.songid)):
     keys = dsubset[dsubset.songid == idx].index.values
     pfs = []
     for key in keys:
@@ -90,87 +94,20 @@ for idx in with_pbar(np.unique(dsubset.songid)[:2]):
             dflist.append([idx, pf])
 
 
-pd.DataFrame(dflist).to_csv(DIRS.DATA / "peak_freqs.csv")
-
 # ──── EXPORT DATAFRAME ─────────────────────────────────────────────────────────
 
 # (plotting will be done in R)
-df = pd.DataFrame(dflist, columns=["ID", "frequency", "ratio"])
 
-df = pd.merge(
-    df,
-    pd.DataFrame(df["iois"].values.tolist()).add_prefix("ioi_"),
-    on=df.song_id,
-).drop("key_0", axis=1)
-df = pd.merge(
-    df,
-    pd.DataFrame(df["ratios"].values.tolist()).add_prefix("ratio_"),
-    on=df.song_id,
-).drop("key_0", axis=1)
-df.to_csv(makedir(DIRS.DATA / "derived") / "peak_freqs.csv", index=False)
+fdf = pd.DataFrame(dflist, columns=["songid", "freqs"])
 
+fdf = (
+    fdf.join(
+        pd.DataFrame(
+            fdf["freqs"].to_list(),
+            columns=["freq_1", "freq_2", "freq_3"],
+            index=fdf.index,
+        )
+    ).drop(["freqs"], axis=1)
+).dropna(subset=["freq_1", "freq_2", "freq_3"])
 
-# Extract peak frequencies
-key = str(dataset.data.index[0])
-f3notes = [v for k, v in get_vocalisation_units(dataset, key).items()][0][:3]
-[get_peak_freq(dataset, S) for S in f3notes]
-
-
-features_df = (
-    dataset.data.groupby(["ID", "type_label"])
-    .filter(lambda x: len(x) > nsamples)
-    .groupby(["ID", "type_label"])
-    .sample(nsamples, random_state=123)
-)[:2000]
-
-
-minmax, mfcc, peakfreq, m_sd_cent_bw = [], [], [], []
-for key in with_pbar(features_df.index):
-    spec = retrieve_spectrogram(dataset.data.at[key, "spectrogram_loc"])
-    features_df.iloc[0].ID
-
-    minfreqs, maxfreqs = approximate_minmax_frequency(
-        dataset, spec=spec, roll_percents=[0.2, 0.7]
-    )
-
-    mean_sd = np.array(
-        [[np.nanmean(i), np.nanstd(i)] for i in [minfreqs, maxfreqs]]
-    ).flatten()
-    minmax.append(mean_sd)
-
-    mfcc.append(get_mean_sd_mfcc(spec, 25))
-    peakfreq.append(get_peak_freq(dataset, spec))
-
-features_dict = {
-    "class_label": features_df.ID + features_df.type_label,
-    "mean_unit_duration": [np.mean(r[:-1]) for r in features_df.unit_durations],
-    "std_unit_duration": [np.std(r[:-1]) for r in features_df.unit_durations],
-    "mean_silence_duration": [
-        np.mean(r[:-1]) for r in features_df.silence_durations
-    ],
-    "std_silence_duration": [
-        np.std(r[:-1]) for r in features_df.silence_durations
-    ],
-    "ioi": [np.mean((r - np.append(r[1:], 0))) for r in features_df.onsets],
-    "ioi_std": [np.std((r - np.append(r[1:], 0))) for r in features_df.onsets],
-    "minmax_freq": minmax,
-    "mfcc": mfcc,
-    "peak_freq": peakfreq,
-}
-
-
-# ──── EXPORT DATAFRAME ─────────────────────────────────────────────────────────
-
-# (plotting will be done in R)
-df = pd.DataFrame(d, columns=["ID", "song_id", "iois", "ratios"])
-df = pd.merge(
-    df,
-    pd.DataFrame(df["iois"].values.tolist()).add_prefix("ioi_"),
-    on=df.song_id,
-).drop("key_0", axis=1)
-df = pd.merge(
-    df,
-    pd.DataFrame(df["ratios"].values.tolist()).add_prefix("ratio_"),
-    on=df.song_id,
-).drop("key_0", axis=1)
-df.to_csv(makedir(DIRS.DATA / "derived") / "interval_ratios.csv", index=False)
+fdf.to_csv(makedir(DIRS.DATA / "derived") / "peak_freqs.csv", index=False)
