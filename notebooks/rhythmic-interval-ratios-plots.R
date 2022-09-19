@@ -15,7 +15,35 @@ box::use(MASS[fractions])
 data <- read_csv(file.path(
     dirs$data, "derived", "interval_ratios.csv"
 ))
+data = data %>% dplyr::mutate(id = 1:nrow(data))
 
+
+
+
+# raster plot as in
+# https://doi.org/10.1016/j.cub.2020.06.072
+
+df <- data %>%
+    dplyr::mutate(sum = ioi_1 + ioi_2, id = 1:nrow(data))
+
+
+sorted_data <- t(apply(df[c("ioi_1", "ioi_2")], 1, sort)) %>%
+    dplyr::as_tibble() %>%
+    dplyr::rename(f1 = V1, f2 = V2) %>%
+    dplyr::mutate(id = 1:nrow(data)) %>% 
+    dplyr::left_join(df) %>%
+    dplyr::mutate(f1 = -f1)
+
+ggplot() +
+    geom_jitter(
+        data = sorted_data, aes(x = f1, y = sum),
+        width = 0.010, height = 0.001, alpha = .1
+    ) +
+    geom_jitter(
+        data = sorted_data, aes(x = f2, y = sum),
+        width = 0.001, height = 0.001, alpha = .1
+    ) +
+    xlim(-1, 1)
 
 
 # Histogram of rhythmic ratios
@@ -126,16 +154,7 @@ ratios <- data.frame(
 )
 colnames(ratios) <- colnames
 
-# ratios <- expand.grid(X = 1:5, Y = 1:5, Z = 1:5) %>%
-#     dplyr::mutate(
-#         name = paste0(X, Y, Z),
-#         ioi_1 = X,
-#         ioi_2 = Y,
-#         ioi_3 = Z
-#     )
 
-# df.mu <- as.data.frame(t(colMedians(as.matrix(data[colnames]))))
-# colnames(df.mu) <- c(colnames)
 
 breaks <- seq(0, 1, by = 0.25)
 labs <- as.character(fractions(seq(0, 1, by = 0.25)))
