@@ -5,6 +5,7 @@ box::use(plt = src / plot)
 box::use(readr[read_csv])
 box::use(ggplot2[...])
 box::use(ggtern[...])
+box::use(dplyr)
 box::use(magrittr[`%>%`])
 box::use(matrixStats[colMedians])
 box::use(MASS[fractions])
@@ -14,17 +15,150 @@ box::use(MASS[fractions])
 data <- read_csv(file.path(
     dirs$data, "derived", "peak_freqs.csv"
 ))
+data <- data %>% dplyr::mutate(id = 1:nrow(data))
+
+# raster plot as in
+# https://doi.org/10.1016/j.cub.2020.06.072
+
+df <- data %>%
+    dplyr::mutate(sum = freq_1 + freq_2, id = 1:nrow(data))
+
+
+sorted_data <- t(apply(df[c("freq_1", "freq_2")], 1, sort)) %>%
+    dplyr::as_tibble() %>%
+    dplyr::rename(f1 = V1, f2 = V2) %>%
+    dplyr::mutate(id = 1:nrow(data)) %>%
+    dplyr::left_join(df) %>%
+    dplyr::mutate(f1 = -f1)
+
+ggplot() +
+    geom_jitter(
+        data = sorted_data, aes(x = f1, y = sum),
+        width = 0.01, height = 0.01, alpha = .05
+    ) +
+    geom_jitter(
+        data = sorted_data, aes(x = f2, y = sum),
+        width = 0.01, height = 0.01, alpha = .05
+    ) +
+    xlim(-10000, 10000)
+
+# Histogram of drequency ratios
+
+breaks <- seq(0.25, 2, by = 0.25)
+labs <- as.character(fractions(seq(0.25, 2, by = 0.25))) %>%
+    gsub("/", ":", .) %>%
+    gsub("^1$", "1:1", .) %>%
+    gsub("^2$", "2:1", .)
+# labs = c("1:4", "1:2", "3:4", "1:2", "5:4", "3:2")
+copper = "#bd7129"
+nighshadz <- "#63313c"
+background = "#262626"
+text_colour <- "#f2f2f2"
+textsize <- 30
+xtick_colour <- rep("#757575", length(breaks))
+xtick_colour[3:(length(breaks) - 3)] <- text_colour
+
+
+data %>%
+    ggplot(aes(x = freq_1 / freq_2)) +
+    geom_vline(xintercept = 0.75, linetype = 2, lwd = 2, colour = "grey") +
+    geom_vline(xintercept = 1, linetype = 2, lwd = 2, colour = "grey") +
+    geom_vline(xintercept = 1.5, linetype = 2, lwd = 2, colour = "grey") +
+    geom_vline(xintercept = 1.25, linetype = 2, lwd = 2, colour = "grey") +
+    geom_histogram(
+        aes(y = ..density..),
+        binwidth = 0.05,
+        fill = nighshadz,
+        colour = NA,
+        alpha = .85
+    ) +
+    geom_density(
+        lwd = 2,
+        linetype = 1,
+        colour = text_colour,
+        n = 1024,
+        bw = 0.02,
+        fill = NA,
+        alpha = .6
+    ) +
+    scale_x_continuous(
+        breaks = breaks,
+        labels = labs,
+        limits = c(breaks[1], breaks[length(breaks)])
+    ) +
+    scale_y_continuous(expand = expansion(
+        mult = c(0, 0.2),
+        add = c(0, 0)
+    )) +
+    labs(
+        x = "Frequency interval ratio",
+        y = "Density"
+    ) +
+    theme(
+        legend.text = element_text(size = textsize),
+        legend.title = element_text(size = textsize),
+        panel.background = element_rect(fill = background),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "none",
+        plot.title.position = "panel",
+        panel.border = element_rect(colour = text_colour, fill = NA, size = 3),
+        text = element_text(colour = text_colour, size = textsize),
+        plot.title = element_text(
+            size = textsize + 10, face = "bold", colour = text_colour,
+            hjust = 0.5, vjust = -3
+        ),
+        plot.subtitle = element_text(
+            size = textsize + 3, colour = text_colour, face = "italic",
+            hjust = 0.5, vjust = -4
+        ),
+        plot.background = element_rect(fill = background, color = NA),
+        plot.margin = unit(c(.8, .8, .8, .8), "cm"),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(
+            colour = xtick_colour, size = textsize,
+            margin = ggplot2::margin(t = 20, r = 0, b = 0, l = 0)
+        ),
+        axis.title.x.bottom = ggtext::element_markdown(
+            margin = ggplot2::margin(t = 20, r = 0, b = 0, l = 0)
+        ),
+        axis.title.y.left = ggtext::element_markdown(
+            margin = ggplot2::margin(t = 0, r = 20, b = 0, l = 0)
+        )
+    ) -> freq_2d
+
+ggsave(
+    freq_2d,
+    path = dirs$figs,
+    filename = "melodic_2d_intervals.png",
+    width = 21,
+    height = 22,
+    units = "cm",
+    dpi = 350,
+    limitsize = FALSE,
+    bg = "transparent"
+)
 
 # TERNARY PLOTS ────────────────────────────────────────────────────────────── #
 
 # Actual interval times
 colnames <- c("name", "freq_1", "freq_2", "freq_3")
 ratios <- data.frame(
-    c(111, 454, 545),
-    c(1, 4, 5),
-    c(1, 5, 4),
-    c(1, 4, 5)
+    c(111, 545, 211, 112, 112, 121, 343),
+    c(1, 5, 2, 1, 1, 1, 3),
+    c(1, 4, 1, 1, 1, 2, 4),
+    c(1, 5, 1, 2, 2, 1, 3)
 )
+
+# ratios <- expand.grid(X = 1:3, Y = 1:3, Z = 1:3) %>%
+#     dplyr::mutate(
+#         name = paste0(X, Y, Z),
+#         freq_1 = X,
+#         freq_2 = Y,
+#         freq_3 = Z
+#     )
 
 colnames(ratios) <- colnames
 breaks <- seq(0, 1, by = 0.25)
@@ -40,33 +174,33 @@ data %>%
         aes(
             fill = ..level..
         ),
-        binwidth = 3
+        binwidth = 20
     ) +
     scale_T_continuous(limits = c(.2, .6), breaks = breaks, labels = breaks) +
     scale_L_continuous(limits = c(.2, .6), breaks = breaks, labels = breaks) +
     scale_R_continuous(limits = c(.2, .6), breaks = breaks, labels = breaks) +
-    scale_fill_viridis_c(
-        option = "magma",
-        alpha = 1,
-        name = "Estimate",
-        # breaks = colticks,
+    colorspace::scale_fill_continuous_sequential(
+        palette = "Lajolla",
+        rev = T,
+        n_interp = 30,
+        name = "Estimate\n",
         guide = guide_colorbar(
             ticks = FALSE,
-            nbin = 80
+            nbin = 1000
         )
     ) +
-    geom_point(size = 0.1, color = "#ffffff", alpha = 0.05) +
+    geom_point(size = 0.1, color = "#ffffff", alpha = 0.1) +
     geom_point(
         data = ratios,
         shape = 3, size = 6, color = "#ffffff", stroke = 1, alpha = 1
     ) +
     geom_text(
-        data = ratios, label = ratios$name, hjust = 0,
-        vjust = -1, color = "#ffffff", size = textsize - 13
+        data = ratios, label = ratios$name, hjust = .5,
+        vjust = -1.6, color = "#ffffff", size = textsize - 13
     ) +
     labs(
         title = "Ternary melodic space",
-        subtitle = "Kernel Density Estimate of melodic ratios",
+        subtitle = "Kernel Density Estimate of frequency ratios",
         x = "",
         xarrow = "1st frequency",
         y = "",
@@ -82,7 +216,7 @@ data %>%
     theme(
         legend.text = element_text(size = textsize),
         legend.title = element_text(size = textsize),
-        panel.background = element_rect(fill = "#000000"),
+        panel.background = element_rect(fill = "#1d0b14"),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         legend.position = "none",
@@ -105,10 +239,8 @@ data %>%
             size = textsize - 2, vjust = 2, colour = text_colour
         ),
         plot.background = element_rect(fill = background, color = NA),
-        plot.margin = margin(1, 1, 1, 1, "cm")
+        plot.margin = unit(c(.8, .8, .8, .8), "cm")
     ) -> freqplot
-
-freqplot
 
 ggsave(
     freqplot,
@@ -122,44 +254,18 @@ ggsave(
     bg = "transparent"
 )
 
-data %>%
-    ggplot(aes(x = ratio_2, y = ratio_1)) +
-    stat_density_2d(
-        geom = "polygon",
-        aes(
-            fill = ..level..,
-            alpha = abs(..level..)
-        ),
-        binwidth = 0.05
-    ) +
-    geom_abline(intercept = 0, linetype = 1, colour = "white", size = 1, alpha = 0.5) +
-    scale_fill_viridis_c(
-        option = "magma",
-        alpha = 1,
-        name = "Estimate",
-        # breaks = colticks,
-        guide = guide_colorbar(
-            ticks = FALSE,
-            nbin = 1000
-        )
-    ) +
-    geom_point(size = 0.1, color = "#ffffff", alpha = 0.4) +
-    theme(panel.background = element_rect(fill = "#000000"))
-# xlim(0.5, 2) +
-# ylim(0.5, 2)
 
+# - ────────────────────────────────────────────────────────────────────────── #
 
 data %>%
-    ggplot(aes(x = ratio_1, y = ratio_0)) +
+    ggplot(aes(x = freq_1, y = freq_2)) +
     geom_point(size = 1, fill = "#000000", alpha = 0.05) +
-    geom_smooth(method = "gam", se = FALSE) +
     stat_density_2d(
         geom = "polygon",
         aes(
             fill = ..level..,
             alpha = abs(..level..)
-        ),
-        binwidth = 0.5
+        )
     ) +
     geom_abline(intercept = 0, linetype = 1, colour = "white", size = 1, alpha = 0.5) +
     scale_fill_viridis_c(
