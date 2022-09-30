@@ -4,7 +4,6 @@
 box::use(src / dirs[dirs])
 box::use(compute = src / compute)
 box::use(plt = src / plot)
-
 box::use(brms[...])
 box::use(readr[read_csv])
 box::use(dplyr[...])
@@ -172,7 +171,7 @@ postpreds %>%
         name = "",
         labels = paste(
             "<span style='font-weight: bold !important; color:",
-            labelcol,
+            shades::brightness(labelcol, 1.1),
             "'>",
             c("Immigrant", "Resident"),
             "</span>"
@@ -188,16 +187,6 @@ postpreds %>%
         size = "none",
         color = guide_legend(override.aes = list(linetype = 0), reverse = TRUE)
     ) +
-    theme(
-        legend.key = element_rect(colour = NA, fill = NA),
-        legend.box.background = element_blank(),
-        legend.text = ggtext::element_markdown(size = 14),
-        legend.position = c(.8, .8),
-        axis.title.x.bottom = ggtext::element_markdown(
-            colour = psetts$text.colour, size = psetts$text.size,
-            margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)
-        )
-    ) +
     coord_cartesian(xlim = c(2, 4), ylim = c(0, 1)) +
     labs(
         x = paste0(
@@ -206,22 +195,38 @@ postpreds %>%
             "(posterior predicted mean)</span>"
         ),
         y = "Density",
-        title = "Northness! Northness!",
-        subtitle = "*A suitable subtitle*<br>"
+        title = "Immigration and\ncultural repertoire size",
+        subtitle = "Posterior conditional effect<br>"
+    ) +
+    theme(
+        plot.title = element_text(
+            size = psetts$text.size + 2, colour = psetts$text.colour, face = "bold"
+        ),
+        plot.subtitle = ggtext::element_markdown(
+            size = psetts$text.size, face = "italic"
+        ),
+        legend.key = element_rect(fill = NA),
+        legend.box.background = element_blank(),
+        legend.text = ggtext::element_markdown(size = 14),
+        legend.position = c(.8, .8),
+        axis.title.x.bottom = ggtext::element_markdown(
+            colour = psetts$text.colour, size = psetts$text.size,
+            margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)
+        )
     ) -> repsize_m_plot
 
-ggsave(
-    filename = "repsize_m_plot.png",
-    plot = repsize_m_plot,
-    path = dirs$figs,
-    scale = 1,
-    width = 13,
-    height = 10,
-    units = "cm",
-    dpi = 350,
-    limitsize = FALSE,
-    bg = "transparent"
-)
+# ggsave(
+#     filename = "repsize_m_plot.png",
+#     plot = repsize_m_plot,
+#     path = dirs$figs,
+#     scale = 1,
+#     width = 13,
+#     height = 10,
+#     units = "cm",
+#     dpi = 350,
+#     limitsize = FALSE,
+#     bg = "transparent"
+# )
 ```
 
 
@@ -229,17 +234,13 @@ ggsave(
 ## Model
 ```{r}
 
-data %>% ggplot(aes(x = prop_immigrants, y = mean_ac_sim, colour = wytham_born)) +
-    geom_smooth() +
-    geom_point()
+
 acsim_neighbours_f <- brmsformula(
     mean_ac_sim ~ 1 +
         wytham_born * prop_immigrants + year + (1 | father),
     family = gaussian()
 )
 
-brms::hypothesis(acsim_neighbours_m, "wytham_bornTRUE:prop_immigrants < 0", robust = TRUE)
-parnames(acsim_neighbours_m)
 acsim_neighbours_m <-
     brm(
         formula = acsim_neighbours_f,
@@ -255,19 +256,22 @@ acsim_neighbours_m <-
         file_refit = "on_change",
         control = list(adapt_delta = 0.9999, max_treedepth = 30)
     )
+
+brms::hypothesis(acsim_neighbours_m, "wytham_bornTRUE:prop_immigrants < 0", robust = TRUE)
+parnames(acsim_neighbours_m)
 ```
 
 ## Plot
 
 ```{r}
 
-
+peffect <- "prop_immigrants:wytham_born"
 acsim_neighbours_cond_effs <- brms::conditional_effects(
     acsim_neighbours_m,
     effects = peffect,
     spaghetti = T,
     points = T,
-    ndraws = 400,
+    ndraws = 150,
     resolution = 300,
     method = "posterior_epred"
 )
@@ -285,7 +289,7 @@ acsim_neighbours_df %>%
             colour = effect2__
         )
     ) +
-    geom_line(alpha = .1, size = .5) +
+    geom_line(alpha = .4, size = .2, show.legend = FALSE) +
     scale_colour_manual(
         name = "",
         labels = paste(
@@ -295,7 +299,7 @@ acsim_neighbours_df %>%
             c("Immigrant", "Resident"),
             "</span>"
         ),
-        values = labelcol
+        values = labelcol,
     ) +
     ggnewscale::new_scale_colour() +
     geom_smooth(
@@ -308,26 +312,49 @@ acsim_neighbours_df %>%
         ),
         method = "lm",
         alpha = .5,
-        size = 1.5,
-        se = FALSE
+        size = 1,
+        se = FALSE,
+        show.legend = FALSE
     ) +
     scale_colour_manual(
-        name = "kk", labels = c("Immigrant", "Resident"),
-        values = c("black", "white")
+        name = "",
+        labels = paste(
+            "<span style='font-weight: bold !important; color:",
+            rev(labelcol),
+            "'>",
+            c("Resident", "Immigrant"),
+            "</span>"
+        ),
+        values = shades::brightness(labelcol, 1.1)
+    ) +
+    guides(
+        size = "none",
+        color = guide_legend(
+            override.aes = list(linetype = 0),
+            reverse = FALSE
+        )
     ) +
     plt$settheme(
         back.fill = psetts$background.colour,
         text.size = psetts$text.size,
         text.colour = psetts$text.colour
     ) +
-    # guides(
-    #     size = "none",
-    #     color = guide_legend(
-    #         override.aes = list(linetype = 0),
-    #         reverse = FALSE
-    #     )
-    # ) +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    # coord_cartesian(xlim = c(2, 4), ylim = c(0, 1)) +
+    labs(
+        x = "Proportion of neighbours<br>that are immigrants",
+        y = "Similarity with neighbours",
+        title = "Immigration and\ncultural similarity",
+        subtitle = "Posterior conditional effects<br>"
+    ) +
     theme(
+        plot.title = element_text(
+            size = psetts$text.size + 2, colour = psetts$text.colour, face = "bold"
+        ),
+        plot.subtitle = ggtext::element_markdown(
+            size = psetts$text.size, face = "italic"
+        ),
         legend.key = element_rect(fill = NA),
         legend.box.background = element_blank(),
         legend.text = ggtext::element_markdown(size = 14),
@@ -336,25 +363,25 @@ acsim_neighbours_df %>%
             colour = psetts$text.colour, size = psetts$text.size,
             margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)
         )
-    ) +
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(expand = c(0, 0)) +
-    # coord_cartesian(xlim = c(2, 4), ylim = c(0, 1)) +
-    labs(
-        x = "Proportion of neighbour immigrants",
-        y = "Song similarity with neighbours",
-        title = "Northness! Northness!",
-        subtitle = "*A suitable subtitle*<br>"
-    ) # -> acsim_neighbours_plot
+    ) -> acsim_neighbours_plot
 
+immplots <- repsize_m_plot + acsim_neighbours_plot +
+    plot_layout(guides = "collect") &
+    theme(
+        plot.margin = unit(c(.8, .2, .8, .8), "cm"),
+        plot.background =
+            ggplot2::element_rect(fill = psetts$background.colour),
+        legend.position = "right"
+    )
 
+# Save combined
 ggsave(
-    filename = "acsim_neighbours_plot.png",
-    plot = acsim_neighbours_plot,
+    filename = "immplots.png",
+    plot = immplots,
     path = dirs$figs,
     scale = 1,
-    width = 13,
-    height = 10,
+    width = 24,
+    height = 14,
     units = "cm",
     dpi = 350,
     limitsize = FALSE,
@@ -364,6 +391,39 @@ ggsave(
 repsize_m_plot
 ```
 
+
+# Acoustic similarity with neighbours: dispersal
+## Model
+```{r}
+
+
+acsim_neighbours_disp_f <- brmsformula(
+    mean_ac_sim ~ 1 +
+        mean_dispersal + wytham_born + prop_immigrants + year + (1 | father),
+    family = gaussian()
+)
+
+acsim_neighbours_disp_m <-
+    brm(
+        formula = acsim_neighbours_disp_f,
+        data = data,
+        # prior = priors,
+        iter = 4000, warmup = 1000,
+        chains = 4,
+        cores = 4,
+        seed = 444,
+        backend = "cmdstanr",
+        # sample_prior = "only",
+        file = file.path(dirs$model_fits, "acsim_neighbours_disp_m"),
+        file_refit = "on_change",
+        control = list(adapt_delta = 0.99, max_treedepth = 15)
+    )
+
+brms::hypothesis(acsim_neighbours_disp_m, "mean_dispersal = 0", robust = TRUE)
+parnames(acsim_neighbours_disp_m)
+conditional_effects(acsim_neighbours_disp_m)
+plot(acsim_neighbours_disp_m)
+```
 
 
 
@@ -1317,14 +1377,6 @@ ggplot() +
         data = sf::st_as_sf(perimeter), fill = NA,
         colour = text_colour, size = 0.3
     ) +
-    # geom_point(
-    #     data = data, aes(
-    #         x = x, y = y
-    #     ),
-    #     pch = 21, fill = "white",
-    #     color = "#ffffff", alpha = 0.4, size = 0.1
-    # ) +
-    # scale_size_continuous(range = c(0.5, 5)) +
     scale_fill_viridis_c(
         option = "magma",
         alpha = 1,
@@ -1392,12 +1444,10 @@ post <-
         rhosq = 1 / (2 * lscale_gpxy^2)
     )
 
-
 # for `slice_sample()`
 set.seed(14)
 
 # wrangle
-
 postd <- post %>%
     slice_sample(n = 150) %>%
     expand(nesting(iter, etasq, rhosq),
