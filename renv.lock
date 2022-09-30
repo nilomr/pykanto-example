@@ -33,6 +33,14 @@
       "Hash": "b2866e62bab9378c3cc9476a1954226b",
       "Requirements": []
     },
+    "DEoptimR": {
+      "Package": "DEoptimR",
+      "Version": "1.0-11",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "b18b34cfbf932e17803c2e3e4b1a2d2a",
+      "Requirements": []
+    },
     "DT": {
       "Package": "DT",
       "Version": "0.23",
@@ -117,6 +125,16 @@
       "Hash": "e9c08b94391e9f3f97355841229124f2",
       "Requirements": []
     },
+    "RcppArmadillo": {
+      "Package": "RcppArmadillo",
+      "Version": "0.11.2.4.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "796805fe55a25e42b5e0aeefacc041dc",
+      "Requirements": [
+        "Rcpp"
+      ]
+    },
     "RcppEigen": {
       "Package": "RcppEigen",
       "Version": "0.3.3.9.2",
@@ -180,6 +198,17 @@
       "Repository": "CRAN",
       "Hash": "543776ae6848fde2f48ff3816d0628bc",
       "Requirements": []
+    },
+    "bayesm": {
+      "Package": "bayesm",
+      "Version": "3.1-4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "79a128bc420b4d0a3debb430b1e91f30",
+      "Requirements": [
+        "Rcpp",
+        "RcppArmadillo"
+      ]
     },
     "bayesplot": {
       "Package": "bayesplot",
@@ -274,6 +303,26 @@
         "rstan",
         "rstantools",
         "shinystan"
+      ]
+    },
+    "broom": {
+      "Package": "broom",
+      "Version": "1.0.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "c948329889c7b24a4201df3aef5058c2",
+      "Requirements": [
+        "backports",
+        "dplyr",
+        "ellipsis",
+        "generics",
+        "ggplot2",
+        "glue",
+        "purrr",
+        "rlang",
+        "stringr",
+        "tibble",
+        "tidyr"
       ]
     },
     "bslib": {
@@ -411,6 +460,19 @@
       "Repository": "CRAN",
       "Hash": "2ba81b120c1655ab696c935ef33ea716",
       "Requirements": []
+    },
+    "compositions": {
+      "Package": "compositions",
+      "Version": "2.0-4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "db2719c9c2910d9d4a3a9f2ce6c8e815",
+      "Requirements": [
+        "MASS",
+        "bayesm",
+        "robustbase",
+        "tensorA"
+      ]
     },
     "cpp11": {
       "Package": "cpp11",
@@ -671,6 +733,16 @@
         "withr"
       ]
     },
+    "ggnewscale": {
+      "Package": "ggnewscale",
+      "Version": "0.4.7",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "df57a381783476d083e9f7350d382c3d",
+      "Requirements": [
+        "ggplot2"
+      ]
+    },
     "ggplot2": {
       "Package": "ggplot2",
       "Version": "3.3.6",
@@ -701,6 +773,26 @@
         "plyr",
         "scales",
         "withr"
+      ]
+    },
+    "ggtern": {
+      "Package": "ggtern",
+      "Version": "3.3.5",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "53ce8a6c8dbb7f132aebc2749c8ff3ec",
+      "Requirements": [
+        "MASS",
+        "compositions",
+        "ggplot2",
+        "gridExtra",
+        "gtable",
+        "hexbin",
+        "latex2exp",
+        "lattice",
+        "plyr",
+        "proto",
+        "scales"
       ]
     },
     "ggtext": {
@@ -776,6 +868,16 @@
       "Repository": "CRAN",
       "Hash": "32600a0bea839c4d0ac998d7c547ecf7",
       "Requirements": []
+    },
+    "hexbin": {
+      "Package": "hexbin",
+      "Version": "1.28.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "76314b69dc54f8c14204063a2fd6d74a",
+      "Requirements": [
+        "lattice"
+      ]
     },
     "highr": {
       "Package": "highr",
@@ -927,6 +1029,17 @@
         "rlang"
       ]
     },
+    "latex2exp": {
+      "Package": "latex2exp",
+      "Version": "0.9.5",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "c9f83888947a8e9c5f73b5b8997e73a9",
+      "Requirements": [
+        "magrittr",
+        "stringr"
+      ]
+    },
     "lattice": {
       "Package": "lattice",
       "Version": "0.20-45",
@@ -1030,6 +1143,23 @@
         "shiny"
       ]
     },
+    "modelr": {
+      "Package": "modelr",
+      "Version": "0.1.8",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "9fd59716311ee82cba83dc2826fc5577",
+      "Requirements": [
+        "broom",
+        "magrittr",
+        "purrr",
+        "rlang",
+        "tibble",
+        "tidyr",
+        "tidyselect",
+        "vctrs"
+      ]
+    },
     "munsell": {
       "Package": "munsell",
       "Version": "0.5.0",
@@ -1081,6 +1211,17 @@
       "Repository": "CRAN",
       "Hash": "022489ebce2ef2438db4583fae118240",
       "Requirements": []
+    },
+    "patchwork": {
+      "Package": "patchwork",
+      "Version": "1.1.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "c446b30cb33ec125ff02588b60660ccb",
+      "Requirements": [
+        "ggplot2",
+        "gtable"
+      ]
     },
     "pillar": {
       "Package": "pillar",
@@ -1207,6 +1348,14 @@
         "rlang"
       ]
     },
+    "proto": {
+      "Package": "proto",
+      "Version": "1.0.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "5cb1623df69ee6102d011c7f78f5791d",
+      "Requirements": []
+    },
     "proxy": {
       "Package": "proxy",
       "Version": "0.4-27",
@@ -1309,6 +1458,16 @@
         "yaml"
       ]
     },
+    "robustbase": {
+      "Package": "robustbase",
+      "Version": "0.95-0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "c918476150dd483a23f1d1cab6d17e76",
+      "Requirements": [
+        "DEoptimR"
+      ]
+    },
     "rprojroot": {
       "Package": "rprojroot",
       "Version": "2.0.3",
@@ -1404,6 +1563,14 @@
         "s2",
         "units"
       ]
+    },
+    "shades": {
+      "Package": "shades",
+      "Version": "1.4.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "3a2cf5eecb2cbca814d01d56bfb51494",
+      "Requirements": []
     },
     "shiny": {
       "Package": "shiny",
