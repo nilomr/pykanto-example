@@ -1,0 +1,54 @@
+# Dependencies
+```{r imports}
+
+box::use(src / dirs[dirs])
+box::use(compute = src / compute)
+box::use(plt = src / plot)
+box::use(brms[...])
+box::use(readr[read_csv])
+box::use(dplyr[...])
+box::use(tidyr[spread, separate, gather, expand, nesting])
+box::use(ggplot2[...])
+box::use(scales[...])
+box::use(terra[...])
+box::use(geosphere[perimeter])
+box::use(plyr[round_any])
+box::use(ggtext[element_markdown])
+box::use(tidybayes[...])
+box::use(forcats[fct_relevel])
+box::use(emmeans[...])
+box::use(patchwork[...])
+box::use(ggnewscale[...])
+```
+
+# Import data
+```{r import-data}
+data <- read_csv(file.path(
+    dirs$resources, "bird_data", "full_dataset_2020-2021.csv"
+))
+dyad_data <- read_csv(file.path(
+    dirs$resources, "bird_data", "dyad_dataset_2020-2021.csv"
+))
+
+data <- data %>% mutate(
+    sharing_index = shared / total_rep,
+    age = as.factor(age)
+)
+dyad_data <- dyad_data %>% mutate(
+    sharing_index = shared / total_rep,
+    imm_status = as.factor(wytham_born_1 + wytham_born_2)
+)
+```
+
+```{r}
+data %>% ggplot(aes(x = dispersal_distance)) +
+    geom_density(bw = 200)
+
+
+data %>% ggplot(aes(x = prop_immigrants)) +
+    geom_density(bw = 0.07)
+
+data %>%
+    group_by(year) %>%
+    dplyr::summarize(mean = mean(wytham_born, na.rm = TRUE))
+```
