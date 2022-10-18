@@ -91,12 +91,10 @@ target/
 
 /reports/text/talks
 embedding_remove
-pykanto/data/datasets
-!pykanto/data/segmented/great_tit
-pykanto/data/segmented/*
+pykanto-example/data/datasets
 /logs/
-/data
-
+/data/*
+!/data/segmented
 # Pytorch/neptune
 */.neptune
 
@@ -107,8 +105,8 @@ pykanto/data/segmented/*
 *.pdf
 .~lock.*
 *.xml
-!pykanto/data/raw/*/*.xml
-!pykanto/data/raw/*/*/*.xml
+!pykanto-example/data/raw/*/*.xml
+!pykanto-example/data/raw/*/*/*.xml
 
 # Mac OS-specific storage files
 .DS_Store
@@ -163,9 +161,6 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
-notebooks/data-analysis/bus_chatter.wav
-notebooks/data-analysis/TEST_REMOVE.py
-
 # Sphinx documentation
 docs/_build/
 #docs/_autosummary
@@ -184,10 +179,10 @@ docs/jupyter_execute/jupyter_execute/*
 MANIFEST.in
 
 source/modules.rst
-source/pykanto.labelapp.rst
-source/pykanto.rst
-source/pykanto.signal.rst
-source/pykanto.utils.rst
-source/pykanto.utils.slurm.rst
+source/pykanto-example.labelapp.rst
+source/pykanto-example.rst
+source/pykanto-example.signal.rst
+source/pykanto-example.utils.rst
+source/pykanto-example.utils.slurm.rst
 docs/doctrees/
 docs/jupyter_execute/

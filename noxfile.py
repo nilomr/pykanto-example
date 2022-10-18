@@ -1,6 +1,6 @@
-import nox
 import pathlib
 import shutil
+
 import nox
 
 DIR = pathlib.Path(__file__).parent.resolve()
@@ -11,7 +11,7 @@ nox.options.sessions = ["test", "coverage"]
 @nox.session
 def build(session: nox.Session) -> None:
     """
-    Build an SDist and wheel with ``flit``.
+    Build an SDist and wheel with flit.
     """
 
     dist_dir = DIR.joinpath("dist")

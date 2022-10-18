@@ -16,26 +16,7 @@ classifiers = [
 requires-python = ">=3.8"
 readme = "README.md"
 license = { file = "LICENSE" }
-dependencies = [
-    "pandas >= 1",
-    "numpy >= 1.17",
-    "scipy >= 1.5",
-    "numba >= 0.49",
-    "tqdm",
-    "audio-metadata >= 0.11.1",
-    "ray[default]",
-    "pysoundfile >= 0.9",
-    "umap-learn >= 0.5",
-    "hdbscan >= 0.8",
-    "seaborn >= 0.11",
-    "scikit-image >= 0.18",
-    "librosa >= 0.8",
-    "bokeh >= 2.3.3",
-    "ujson",
-    "psutil",
-    "attrs",
-    "gitpython",
-]
+dependencies = ["pykanto", "typer", "neptune-client"]
 
 [project.optional-dependencies]
 dev = ["ipywidgets", "ipykernel", "pytest", "nox", "black"]

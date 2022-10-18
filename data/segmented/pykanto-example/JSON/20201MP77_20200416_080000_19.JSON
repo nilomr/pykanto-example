@@ -1,0 +1,16 @@
+{
+  "sample_rate": 22050,
+  "bit_rate": 768000,
+  "length_s": 2.432517006802721,
+  "ID": "20201MP77",
+  "label": "GRETI_HQ",
+  "start": 5729444,
+  "end": 5846204,
+  "lower_freq": 2836,
+  "upper_freq": 5850,
+  "max_amplitude": 0.16620537247927206,
+  "min_amplitude": -0.16517256283204476,
+  "source_wav": "/home/nilomr/projects/greti-main/data/wytham-great-tit/raw/GRETI_2020/20201MP77/20200416_080000.WAV",
+  "annotation_file": "/home/nilomr/projects/greti-main/data/wytham-great-tit/raw/GRETI_2020/20201MP77/20200416_080000.xml",
+  "wav_file": "/home/nilomr/projects/greti-main/data/segmented/greti_2020/WAV/20201MP77_20200416_080000_19.wav"
+}

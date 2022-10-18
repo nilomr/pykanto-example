@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Any, Optional
 
 import git
 import ray
@@ -17,7 +16,6 @@ from pykanto.utils.paths import ProjDirs
 # ──── SETTINGS ─────────────────────────────────────────────────────────────────
 
 app = typer.Typer()
-
 
 @app.command(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
@@ -48,8 +46,7 @@ def main(
         ray.init(address=os.environ["ip_head"], _redis_password=redis_password)
         typer.echo(ray.cluster_resources())
 
-    # Create a ProjDirs object for the project, including location of raw data to
-    # use
+    # Create a ProjDirs object for the project, w/ location of raw data to use
     project_root = Path(
         git.Repo(".", search_parent_directories=True).working_tree_dir
     )
@@ -64,17 +61,17 @@ def main(
         n_fft=1024,
         num_mel_bins=224,
         sr=22050,
-        top_dB=65,  # top dB to keep
+        top_dB=65,  
         lowcut=2000,
         highcut=10000,
         # Segmentation
-        max_dB=-30,  # Max threshold for segmentation
-        dB_delta=5,  # n thresholding steps, in dB
-        silence_threshold=0.1,  # Between 0.1 and 0.3 tends to work
-        max_unit_length=0.4,  # Maximum unit length allowed
-        min_unit_length=0.02,  # Minimum unit length allowed
-        min_silence_length=0.001,  # Minimum silence length allowed
-        gauss_sigma=3,  # Sigma for gaussian kernel
+        max_dB=-30,
+        dB_delta=5,
+        silence_threshold=0.1,
+        max_unit_length=0.4,
+        min_unit_length=0.02,
+        min_silence_length=0.001,
+        gauss_sigma=3,
         # general settings
         song_level=True,
         subset=None,
@@ -83,8 +80,6 @@ def main(
 
     # ──── BUILD AND SAVE DATASET ───────────────────────────────────────────────────
 
-    # np.random.seed(123)
-    # random.seed(123)
     dataset = KantoData(
         DIRS,
         parameters=params,
