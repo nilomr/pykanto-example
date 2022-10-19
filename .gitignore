@@ -91,10 +91,18 @@ target/
 
 /reports/text/talks
 embedding_remove
-pykanto-example/data/datasets
 /logs/
-/data/*
+data/*
 !/data/segmented
+!data/datasets
+data/datasets/*
+!data/datasets/pykanto-example
+data/datasets/pykanto-example/*
+!data/datasets/pykanto-example/checked_labels.csv
+
+
+
+
 # Pytorch/neptune
 */.neptune
 
