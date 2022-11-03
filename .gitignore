@@ -87,10 +87,9 @@ target/
 /references/
 /test/
 
-/dependencies/chipper_v1.0_linux
 
 /reports/text/talks
-embedding_remove
+reports/figures/*
 /logs/
 data/*
 !/data/segmented
