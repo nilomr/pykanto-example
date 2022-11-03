@@ -3,8 +3,8 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "pykanto"
-description = "A library for managing and analysing animal vocalisation data."
+name = "pykanto-example"
+description = "A worked example showing a use case for pykanto"
 version = "0.0.1"
 authors = [{ name = "Nilo M. Recalde", email = "nilomerinorecalde@gmail.com" }]
 classifiers = [
@@ -16,11 +16,12 @@ classifiers = [
 requires-python = ">=3.8"
 readme = "README.md"
 license = { file = "LICENSE" }
-dependencies = ["pykanto", "typer", "neptune-client"]
+dependencies = ["pykanto", "typer"]
 
 [project.optional-dependencies]
-dev = ["ipywidgets", "ipykernel", "pytest", "nox", "black"]
-test = ["pytest >=7"]
+dev = ["pytest >=7", "nox", "black"]
+jupyter = ["ipywidgets", "ipykernel", "nb_conda_kernels", "jupyterlab"]
+torch = ["neptune-client", "pytorch-lightning"]
 doc = [
     "sphinx",
     "sphinx-copybutton",
@@ -30,11 +31,7 @@ doc = [
 ]
 
 [project.urls]
-Source = "https://github.com/nilomr/pykanto"
-Documentation = "https://nilomr.github.io/pykanto"
-
-[project.scripts]
-pykanto-slaunch = 'pykanto.utils.slurm.launch:submit_job'
+Source = "https://github.com/nilomr/pykanto-example"
 
 [tool.black]
 line-length = 80
