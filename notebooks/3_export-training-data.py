@@ -92,7 +92,8 @@ df = (
 )
 
 df_sub = pd.concat(
-    [data.sample(n=min_sample) for _, data in df.groupby(["ID", "class_label"])]
+    [data.sample(n=min_sample, random_state=42) for _, data in 
+    df.groupby(["ID", "class_label"])]
 )
 
 # Remove songs labelled as noise (-1)
