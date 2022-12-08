@@ -58,6 +58,14 @@ dataset = load_dataset(out_dir, DIRS)
 # Get labels
 imgpaths = [i for i in train_path.glob("*/*.jpg")]
 fnames = np.unique(feat_vec.index.values)
+
+imnames=  [i.stem for i in imgpaths]
+
+# fnames not in imnames:
+
+not_in= [i for i in fnames if i not in imnames]
+len(not_in)
+
 labels = []
 for fname in with_pbar(fnames, total=len(fnames)):
     for p in imgpaths:

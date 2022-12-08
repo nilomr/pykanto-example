@@ -9,7 +9,7 @@ import pandas as pd
 from pykanto.utils.io import load_dataset
 from pykanto.utils.paths import ProjDirs
 
-#──── SETTINGS ─────────────────────────────────────────────────────────────────
+# ──── SETTINGS ─────────────────────────────────────────────────────────────────
 
 DATASET_ID = "pykanto-example"
 
@@ -20,19 +20,19 @@ project_root = Path(
 segmented_dir = project_root / "data" / "segmented" / DATASET_ID
 DIRS = ProjDirs(project_root, segmented_dir, DATASET_ID, mkdir=True)
 
-#──── LOAD DATASET ─────────────────────────────────────────────────────────────
+# ──── LOAD DATASET ─────────────────────────────────────────────────────────────
 
 # Open an existing dataset
 out_dir = DIRS.DATA / "datasets" / DATASET_ID / f"{DATASET_ID}.db"
 dataset = load_dataset(out_dir, DIRS)
 
-# Check an example:
-dataset.plot(str(dataset.data.index[100]), segmented=True)
+# Check an example: (uncomment if running interactively)
+# dataset.plot(str(dataset.data.index[100]), segmented=True)
 
 # Save dataset as csv
 dataset.to_csv(DIRS.DATASET.parent, timestamp=False)
 
-#──── CHECK OR LOAD LABELS ─────────────────────────────────────────────────────
+# ──── CHECK OR LOAD LABELS ─────────────────────────────────────────────────────
 
 """
 Now you can either use the interactive app or load existing labels:
@@ -46,6 +46,5 @@ if use_app:
     dataset = dataset.reload()
 else:
     df = pd.read_csv(DIRS.DATASET.parent / "checked_labels.csv", index_col=0)
-    dataset.data.insert(2, 'class_label', df.class_label.astype("string"))
+    dataset.data.insert(2, "class_label", df.class_label.astype("string"))
     dataset.save_to_disk()
-

@@ -48,13 +48,12 @@ umap_dir = DIRS.DATA / "datasets" / DATASET_ID / "embedding.csv"
 umap_df = pd.read_csv(umap_dir, index_col=None, converters={"colours": eval})
 
 
-#──── PLOT SOME MATCHING SONGS ─────────────────────────────────────────────────
+# ──── PLOT SOME MATCHING SONGS ─────────────────────────────────────────────────
 
-# Find rows where type is 'same year':
-same_year = all_df[all_df['type'] == 'same year']
+# Find rows where type is 'top hits':
 
 toplot = (
-    all_df[all_df['type'] == 'same year'][['class1', 'class2']]
+    all_df[all_df["type"] == "top hits"][["class1", "class2"]]
     .sample(10, random_state=42)
     .values
 )
@@ -77,16 +76,19 @@ for i, bird in enumerate(toplot):
         plt.close()
 
 
-#──── PLOT DISTRIBUTION OF SIMILARITY SCORES ───────────────────────────────────
+# ──── PLOT DISTRIBUTION OF SIMILARITY SCORES ───────────────────────────────────
 
 sns.set_style("ticks")
-ax = sns.stripplot(data=all_df, x="type", y="dist", color="k", size=2)
+fig = plt.figure()
+ax = fig.add_subplot(111, aspect=3)
+sns.stripplot(
+    ax=ax, data=all_df, x="type", y="dist", color="k", size=2, alpha=0.5
+)
 sns.despine(offset=10, trim=True, bottom=True)
-ax.tick_params(bottom=False)
+plt.tight_layout()
 plt.show()
 
-
-#──── PLOT UMAP ────────────────────────────────────────────────────────────────
+# ──── PLOT UMAP ────────────────────────────────────────────────────────────────
 
 # Plot UMAP projection
 plt.rcParams.update(
