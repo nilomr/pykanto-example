@@ -1,4 +1,7 @@
-box::use(ggplot2[...], dplyr, readr[read_csv], ggdist[stat_dots], here, beeswarm)
+box::use(
+  ggplot2[...], dplyr, readr[read_csv], ggdist[stat_dots], here, beeswarm,
+  shades
+)
 
 # DATA INGEST ──────────────────────────────────────────────────────────────── #
 
@@ -13,13 +16,19 @@ umap_df <- here::here("data", "datasets", DATASET_ID, "embedding.csv") |>
 
 # Plot settings
 main_df$colour <- ifelse(grepl("different bird", main_df$type), "different", "same")
-background_colour <- "#eeeeee"
+background_colour <- "#363636"
 level_order <- c("different bird", "different year", "same year", "top hits")
 labels <- c(
   "Different birds", "Same bird, diff. year",
   "Same bird, same year", "Same bird, diff. year\n(top result)"
 )
 label_colours <- c("#38808a", "#d1a11e", "#df882b", "#bd503d")
+label_colours <- shades::brightness(label_colours, .9)
+
+colour_dict <- list(
+  "grey_text" = "#403e44"
+)
+
 font_size <- 15
 
 
@@ -57,13 +66,18 @@ main_df |> ggplot(aes(
   ) +
   ggtitle("Comparing acoustic similarity") +
   labs(y = "Density", x = "Acoustic similarity") +
-  scale_y_continuous(expand = expansion(mult = c(.1, .1))) +
+  scale_y_continuous(limits = c(0, 10), expand = expansion(mult = c(.12, .1))) +
   guides(fill = guide_legend(byrow = TRUE)) +
   theme(
-    # add space between legend items:
+    legend.justification = c(0, 1),
+    legend.position = c(0, 1),
     legend.spacing.y = unit(.8, "lines"),
+    legend.background = element_blank(),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
     aspect.ratio = 1,
     text = element_text(size = font_size, family = "Helvetica"),
+    axis.ticks = element_blank(),
     axis.text.x = element_text(
       color = colour_dict$grey_text, size = font_size * .8,
       margin = margin(t = 20, r = 0, b = 0, l = 0)
@@ -72,7 +86,7 @@ main_df |> ggplot(aes(
       color = colour_dict$grey_text, size = font_size * .8,
       margin = margin(t = 0, r = 10, b = 0, l = 0)
     ),
-    panel.grid.major = element_blank(),
+    panel.grid.major = element_line(color = "#4d4d4d"),
     panel.grid.minor = element_blank(),
     plot.title = element_text(
       size = font_size * 1.3, face = "bold",
