@@ -17,6 +17,7 @@ from pykanto.utils.paths import ProjDirs
 
 app = typer.Typer()
 
+
 @app.command(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
 )
@@ -48,7 +49,7 @@ def main(
 
     # Create a ProjDirs object for the project, w/ location of raw data to use
     project_root = Path(
-        git.Repo(".", search_parent_directories=True).working_tree_dir
+        git.Repo(".", search_parent_directories=True).working_tree_dir  # type: ignore
     )
     segmented_dir = project_root / "data" / "segmented" / data_folder
     DIRS = ProjDirs(project_root, segmented_dir, dataset_id, mkdir=True)
@@ -61,7 +62,7 @@ def main(
         n_fft=1024,
         num_mel_bins=224,
         sr=22050,
-        top_dB=65,  
+        top_dB=65,
         lowcut=2000,
         highcut=10000,
         # Segmentation
