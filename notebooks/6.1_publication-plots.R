@@ -1,6 +1,6 @@
 box::use(
   ggplot2[...], dplyr, readr[read_csv], ggdist[stat_dots], here, beeswarm,
-  shades
+  shades, patchwork[...]
 )
 
 # DATA INGEST ──────────────────────────────────────────────────────────────── #
@@ -15,14 +15,16 @@ umap_df <- here::here("data", "datasets", DATASET_ID, "embedding.csv") |>
 
 
 # Plot settings
+
+fig_dir <- here::here("reports", "figures")
 main_df$colour <- ifelse(grepl("different bird", main_df$type), "different", "same")
 background_colour <- "#363636"
-level_order <- c("different bird", "different year", "same year", "top hits")
+level_order <- c("different bird", "different year", "top hits", "same year")
 labels <- c(
-  "Different birds", "Same bird, diff. year",
-  "Same bird, same year", "Same bird, diff. year\n(top result)"
+  "Different birds", "Same bird, diff. year", "Top hit:\nSame bird, diff. year",
+  "Same bird, same year"
 )
-label_colours <- c("#38808a", "#d1a11e", "#df882b", "#bd503d")
+label_colours <- c("#38808a", "#d1a11e", "#bb4631", "#df882b")
 label_colours <- shades::brightness(label_colours, .9)
 
 colour_dict <- list(
@@ -37,11 +39,18 @@ main_df |> ggplot(aes(
   x = dist,
   fill = factor(type, level = level_order)
 )) +
-  geom_density(alpha = .7, colour = NA, adjust = 1.3) +
+  ggdist::stat_slab(
+    alpha = .8,
+    trim = FALSE,
+    adjust = 1.2,
+    colour = "#f0f0f0",
+    size = .5
+    # fill = rgb2[2]
+  ) +
   geom_rug(
     sides = "b",
     length = unit(10, "mm"),
-    size = .8,
+    linewidth = .8,
     mapping = aes(
       alpha = factor(type, level = level_order),
       color = factor(type, level = level_order)
@@ -64,17 +73,32 @@ main_df |> ggplot(aes(
     values = label_colours,
     breaks = level_order,
   ) +
-  ggtitle("Comparing acoustic similarity") +
-  labs(y = "Density", x = "Acoustic similarity") +
-  scale_y_continuous(limits = c(0, 10), expand = expansion(mult = c(.12, .1))) +
+  geom_hline(
+    yintercept = 0,
+    colour = "#f0f0f0",
+    size = .5
+  ) +
+  labs(
+    title = "Comparing acoustic similarity",
+    y = "Density", x = "Acoustic similarity"
+  ) +
+  scale_y_continuous(limits = c(-.046, 1)) +
+  # add ticks and labels at 0 to 1 in 0.2 steps, 0 and 1 without decimals:
+  scale_x_continuous(
+    breaks = seq(0, 1, by = .2),
+    labels = c("0", "0.2", "0.4", "0.6", "0.8", "1")
+  ) +
   guides(fill = guide_legend(byrow = TRUE)) +
+  # force square plot:
+  coord_fixed(ratio = 1) +
   theme(
+    # force square:
     legend.justification = c(0, 1),
-    legend.position = c(0, 1),
+    legend.position = c(.05, .95),
     legend.spacing.y = unit(.8, "lines"),
     legend.background = element_blank(),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
+    legend.text = element_text(color = "white", size = font_size),
+    legend.title = element_text(color = "white", size = font_size, face = "bold"),
     aspect.ratio = 1,
     text = element_text(size = font_size, family = "Helvetica"),
     axis.ticks = element_blank(),
@@ -109,67 +133,17 @@ main_df |> ggplot(aes(
       colour = background_colour,
       fill = background_colour, linewidth = 10
     )
-  )
+  ) -> ac_sim_densiplot
 
 
-# JITTER PLOT VERSION ──────────────────────────────────────────────────────── #
-
-level_order <- c("different bird", "top hits", "same year", "different year")
-colour_dict <- list(
-  "grey_text" = "#403e44"
+ggsave(
+  filename = file.path(fig_dir, "ac_sim_densiplot.png"),
+  plot = ac_sim_densiplot,
+  width = 20,
+  height = 20,
+  units = "cm",
+  dpi = 300
 )
-
-main_df |> ggplot(aes(y = dist, x = factor(type, level = level_order))) +
-  geom_jitter(aes(colour = colour, alpha = type), width = .2, height = 0) +
-  scale_alpha_manual(
-    values = c(.3, .8, .3, .3),
-    breaks = level_order,
-    # do not include legend:
-    guide = "none"
-  ) +
-  scale_colour_manual(
-    name = "Which bird?",
-    values = c("#c9992d", "#24808d"),
-    breaks = c("different", "same")
-  ) +
-  scale_x_discrete(
-    labels = c("different bird", "top hits\n(different year)", "same year", "different year")
-  ) +
-  ggdist::stat_pointinterval(
-    position = "dodge",
-    scale = .5,
-    point_size = 5,
-    point_interval = ggdist::median_qi,
-    .width = c(.66, .95),
-    interval_size_range = c(.9, 2.5),
-    interval_colour = "black",
-    point_colour = "black",
-    fatten_point = 3
-  ) +
-  ggtitle("Comparing acoustic similarity") +
-  labs(x = NULL, y = "Acoustic similarity") +
-  theme(
-    # remove panel background and leave outline:
-    panel.background = element_blank(),
-    panel.border = element_rect(fill = NA, color = "black"),
-    aspect.ratio = 1,
-    text = element_text(size = 15, family = "Helvetica"),
-    axis.text.x = element_text(
-      color = colour_dict$grey_text, size = 15,
-      margin = margin(t = 20, r = 0, b = 0, l = 0)
-    ),
-    axis.text.y = element_text(
-      color = colour_dict$grey_text, size = 10,
-      margin = margin(t = 0, r = 10, b = 0, l = 0)
-    ),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    axis.title.y = element_text(
-      size = 15,
-      margin = margin(t = 0, r = 20, b = 0, l = 0)
-    )
-  )
-
 
 # PLOT UMAP EMBEDDING ──────────────────────────────────────────────────────── #
 
@@ -183,7 +157,7 @@ umap_df |> ggplot(
 ) +
   # marker type by group 'markers':
   geom_point(
-    size = 5,
+    size = 3,
   ) +
   scale_shape_manual(
     name = "Year",
@@ -191,19 +165,38 @@ umap_df |> ggplot(
     labels = c("2020", "2021")
   ) +
   scale_alpha_manual(
-    values = c(.7, .3),
+    values = c(.7, .5),
     guide = "none"
   ) +
-  scale_color_discrete() +
-  ggtitle("Comparing acoustic similarity") +
-  labs(y = "Density", x = "Acoustic similarity") +
+  # vector with 12 colours:
+  scale_colour_manual(
+    # add 12 differnt colours:
+    values = c(
+      "#e2a71e", "#000000", "#000000", "#000000", "#000000",
+      "#000000", "#c5453c", "#000000", "#000000", "#000000", "#000000", "#29bec9"
+    ),
+    guide = "none"
+  ) +
+  # scale_color_discrete(type = c()) +
+  labs(
+    title = "2D embedding of all songs",
+    y = "UMAP 2", x = "UMAP 1"
+  ) +
   scale_y_continuous(expand = expansion(mult = c(.1, .1))) +
-  guides(fill = guide_legend(byrow = TRUE)) +
+  guides(fill = guide_legend(byrow = TRUE), shape = guide_legend(override.aes = list(color = "white"))) +
+  coord_fixed(ratio = 1) +
   theme(
-    # add space between legend items:
+    legend.justification = c(0, 1),
+    legend.position = c(.05, .95),
     legend.spacing.y = unit(.8, "lines"),
+    legend.background = element_rect(fill = "transparent", colour = NA),
+    legend.box.background = element_rect(fill = "transparent", colour = NA),
+    legend.key = element_rect(fill = "transparent", colour = NA),
+    legend.text = element_text(color = "white", size = font_size),
+    legend.title = element_text(color = "white", size = font_size, face = "bold"),
     aspect.ratio = 1,
     text = element_text(size = font_size, family = "Helvetica"),
+    axis.ticks = element_blank(),
     axis.text.x = element_text(
       color = colour_dict$grey_text, size = font_size * .8,
       margin = margin(t = 20, r = 0, b = 0, l = 0)
@@ -212,7 +205,7 @@ umap_df |> ggplot(
       color = colour_dict$grey_text, size = font_size * .8,
       margin = margin(t = 0, r = 10, b = 0, l = 0)
     ),
-    panel.grid.major = element_blank(),
+    panel.grid.major = element_line(color = "#4d4d4d"),
     panel.grid.minor = element_blank(),
     plot.title = element_text(
       size = font_size * 1.3, face = "bold",
@@ -235,4 +228,29 @@ umap_df |> ggplot(
       colour = background_colour,
       fill = background_colour, linewidth = 10
     )
+  ) -> ac_sim_scatterplot
+
+
+ggsave(
+  filename = file.path(fig_dir, "ac_sim_scatterplot.png"),
+  plot = ac_sim_scatterplot,
+  width = 20,
+  height = 20,
+  units = "cm",
+  dpi = 300
+)
+
+
+(ac_sim_densiplot + plot_spacer() + ac_sim_scatterplot +
+  plot_layout(widths = c(4, .3, 4))) -> ac_sim_both
+
+for (f in c("png", "svg")) {
+  ggsave(
+    filename = file.path(fig_dir, paste0("ac_sim_both.", f)),
+    plot = ac_sim_both,
+    width = 40,
+    height = 20,
+    units = "cm",
+    dpi = 300
   )
+}
