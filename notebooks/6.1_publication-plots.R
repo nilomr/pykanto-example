@@ -254,3 +254,5 @@ for (f in c("png", "svg")) {
     dpi = 300
   )
 }
+
+print("Done!")
