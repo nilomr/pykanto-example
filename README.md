@@ -3,7 +3,7 @@
 <div align='center'>
 
 <a href="https://nilomr.github.io/pykanto">
-    <img src="reports/figures/pykanto-logo-grey-04.svg" alt="pykanto logo" title="pykanto" height="80" style="padding-bottom:1em !important;" /> (Use example)
+    <img src="reports/figures/pykanto-logo-grey-04.svg" alt="pykanto logo" title="pykanto" height="80" style="padding-bottom:1em !important;" />
 </a> 
 
 <br>
@@ -15,38 +15,56 @@
 ![Open Source Love](https://img.shields.io/badge/open%20source-♡-lightgrey)
 ![Python 3.8](https://img.shields.io/badge/python->=3.8-blue.svg)
 
-**pykanto** is a python library to manage and analyse bird vocalisations. This is a reproducible example showcasing one of its possible applications. 
+This is a reproducible example demonstrating how to use [**pykanto**](https://github.com/nilomr/pykanto), a python
+library to manage and analyse animal vocalisations. We use a small sample
+dataset to answer a real research question: can individual birds be recognised
+by their song?
 
 [Installation](#installation) •
-[Getting started](#getting-started) •
-# 
+[User guide](#user-guide) •
+[Article](https://nilomr.github.io/pykanto-example)
+#
 
 </div>
 
 ### Installation
 
-> Note: this is a large repository (~600 MiB) including the data necessary to train a deep learning model and reproduce the results included in the paper. It might take a couple of minutes to download.
+> Note: this is a large repository (~600 MiB) including the data necessary to
+> train a deep learning model and reproduce the results included in the paper.
+> It might take a couple of minutes to download, or longer if you have a slow connection.
 
-Create a new environment, e.g. using conda:
-
+1. Create a new environment, e.g. using miniconda:
 ```bash
 conda create -n pykanto-example python=3.8
 ```
-Then install pykanto:see [installing pykanto](https://nilomr.github.io/pykanto/contents/1_getting-started.html) for a complete installation guide for the library. (Or just run `pip install pykanto`!)
+2. Install pykanto:
+See [installing
+pykanto](https://nilomr.github.io/pykanto/contents/1_getting-started.html) for a
+complete installation guide for the library, or just run `pip install
+pykanto`.
 
-Finally, install this example:
+3. Clone this repository to your computer, navigate to its root and install
+using pip:
 
 ```bash
+git clone https://github.com/nilomr/pykanto-example.git
+cd pykanto-example
 pip install .
 ```
 
-Note: you can also install in developer mode, and install along extra dependencies that you might find useful: `pip install -e ."[extras]"`. See `[project.optional-dependencies]` in the pyproject.toml file to see options for `extras`.
+##### GPU installation
 
+One of the steps to reproduce this example involves training a deep neural
+network, which requires compatible GPU resources. The repository includes the
+feature vectors output by the model, so **this step can be**
+safely **skipped** if you don't want to train the NN again. 
 
-
-One of the steps to reproduce this example involves training a deep neural network, which requires compatible GPU resources. The repository includes the feature vectors output by the model under version control, so the step can be safely skipped. 
-
-If you do want to train the model yourself, you'll need a few more libraries that are not installed automatically with pykanto. This is just because they are a bit finicky: which installation you need depends on which version of CUDA you have and the like).
+<details>
+  <summary>Expand</summary>
+<br>
+If you do want to train the model yourself, you will need a few more libraries
+that are not installed automatically with pykanto. The reason for this is that the are a bit finicky: which exact installation you need depends on which version of
+CUDA you have and the like.
 
 I recommend that, if this is the case, you first create a fresh environment with conda:
 
@@ -58,69 +76,46 @@ And then install torch, pykanto and this example including the extra libraries.
 ```bash
 conda install -c pytorch pytorch torchvision   
 pip install pykanto
+# Navigate to the root of this repository, then:
 pip install ."[torch]"
 ```
+</details>
 
 
+##### Developer installation
+
+You can also install in developer mode, and install along extra dependencies that you might find useful: `pip install -e ."[extras]"`. See `[project.optional-dependencies]` in the pyproject.toml file to see options for `extras`.
+
+### User guide
 
 
-### Getting started
-
-[Sample pipeline](https://nilomr.github.io/pykanto/contents/2_basic-workflow.html)
-
-### Use guide
+First, make sure that you have activated this project's environment (`conda
+activate pykanto-example` if you followed the instructions above). Then,
+navigate to ```/notebooks```. This is where the scripts are located. They can
+all be run from the terminal, `python <script-name>`.
 
 <details>
-  <summary><b>Click to expand</b></summary>
-  
-#### Prepare dataset
-First, make sure that you have activated this project's environment (```pykanto-example``` if you followed the instructions above). Next, let's run a simple app that calls the relevant ```pykanto``` methods to ingest, create spectrograms, and segment the dataset.
+  <summary>Expand user guide</summary>
+<br>
 
-Next, navigate to the ```/notebooks``` folder.
+| Script                      | Description                                                         | Use                                                                                                                                                                                                                                           |
+| --------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `1_prepare-dataset.py`      | Ingests, creates spectrograms, and segments the dataset[^1]         | To run: `python 1_prepare-dataset.py -d pykanto-example -f pykanto-example`, to see options: `python 1_prepare-dataset.py --help`                                                                                                             |
+| `2_interactive-labels.py`   | Opens an interactive app to check the automatically assigned labels | The latter step requries user input so it's disabled by default for reproducibility. If you want to test the app yourself set `use_app = False` in that script. To learn how to use it, see [using the interactive app](./interactive-app.md) |
+| `3_export-training-data.py` | Exports the data required to train the deep learning model          | `python 3_export-training-data.py --help`                                                                                                                                                                                                     |
+| `4_train-model.ipynb`       | Model definition and training step                                  | A separate, self-contained jupyter notebook.This is to make it easier to run interactively on a GPU-enabled HPC. If you don't want to retrain the model, you can skip this step                                                               |
+| `5_measure-similarity.py`   | Measures the similarity between songs across years and birds        | NA                                                                                                                                                                                                                                            |
+| `6_plot-results.py`         | Plots the results.                                                  | Will output to graphics device but not save.                                                                                                                                                                                                  |
+| `6.1_publication-plots.R`   | Reproduce the exact plots included in the paper                     | Switch to R and run `Rscript -e 'renv::run("6.1_publication-plots.R")'` after [installing the R dependecies](https://rstudio.github.io/renv/articles/renv.html) via `renv::restore()`                                                         |
 
-If you want to see which options are available, run
-
-```bash
-python 2_prepare-dataset.py --help
-```
-This is a reproducible example, so in this case just run the following:
-
-```bash
-python 1_prepare-dataset.py -d pykanto-example -f pykanto-example
-```
-If you want to run this in a HPC you can use `pykanto`'s tool for this, which makes it very easy: file:///home/nilomr/projects/pykanto/docs/html/contents/hpc.html
+[^1]: If you want to run this in a HPC you can use `pykanto`'s tool for this,
+    which makes it very easy: (see [Docs]() for more info) 
 
 ```bash
 pykanto-slaunch --exp BigBird2020 --p short --time 01:00:00 -n 1 --memory 40000 --gpu 0 -c "python 1_prepare-dataset.py -d pykanto-example -f pykanto-example" -env pykanto-example
 ```
 
-The rest are computationally much lighter scripts, you can run them like so:
-
-```
-python 2_interactive-labels.py
-python 3_export-training-data.py 
-```
-Now the dataset is ready to do whatever you please with it! In our case, we're going to 
-
-
-#### Use the interactive app
-
-Now you can start the interactive app on your browser by simply running `dataset.open_label_app()`. To learn how to use it, see [using the interactive app](./interactive-app.md). #FIXME - link to pykanto docs
-
-Once you are done checking the automatically assigned labels you need to reload the dataset:
-
-```python
-dataset = dataset.reload()
-```
-
-### Some Code
-```js
-function logSomething(something) {
- console.log('Something', something);
-}
-```
 </details>
-
 
 <sub>© Nilo M. Recalde, 2021-present</sub>
 
