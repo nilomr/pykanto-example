@@ -99,6 +99,12 @@ data/datasets/*
 data/datasets/pykanto-example/*
 !data/datasets/pykanto-example/checked_labels.csv
 
+!/data/datasets/pykanto-example/ML/
+/data/datasets/pykanto-example/ML/*
+!/data/datasets/pykanto-example/ML/output
+/data/datasets/pykanto-example/ML/output/*
+!/data/datasets/pykanto-example/ML/output/feat_vectors.csv
+
 
 
 
