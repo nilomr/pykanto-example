@@ -11,7 +11,6 @@ import seaborn as sns
 from pykanto.utils.compute import with_pbar
 from pykanto.utils.io import load_dataset
 from pykanto.utils.paths import ProjDirs
-from umap import UMAP
 
 # ──── SETTINGS ─────────────────────────────────────────────────────────────────
 
