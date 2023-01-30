@@ -27,30 +27,32 @@ by their song?
 
 </div>
 
-### Installation
-
 > Note: this is a large repository (~600 MiB) including the data necessary to
 > train a deep learning model and reproduce the results included in the paper.
 > It might take a couple of minutes to download, or longer if you have a slow connection.
+### Installation
 
-1. Create a new environment, e.g. using miniconda:
-```bash
-conda create -n pykanto-example python=3.8
-```
-2. Install pykanto:
+
+- Create a new environment, e.g. using miniconda:
+  ```bash
+  conda create -n pykanto-example python=3.8
+  ```
+- Install pykanto:
 See [installing
 pykanto](https://nilomr.github.io/pykanto/contents/1_getting-started.html) for a
 complete installation guide for the library, or just run `pip install
 pykanto`.
 
-3. Clone this repository to your computer, navigate to its root and install
+- Clone this repository to your computer, navigate to its root and install
 using pip:
 
-```bash
-git clone https://github.com/nilomr/pykanto-example.git
-cd pykanto-example
-pip install .
-```
+  ```bash
+  git clone https://github.com/nilomr/pykanto-example.git
+  cd pykanto-example
+  pip install .
+  ```
+<br>
+
 
 ##### GPU installation
 
@@ -84,7 +86,12 @@ pip install ."[torch]"
 
 ##### Developer installation
 
-You can also install in developer mode, and install along extra dependencies that you might find useful: `pip install -e ."[extras]"`. See `[project.optional-dependencies]` in the pyproject.toml file to see options for `extras`.
+You can also install in developer mode, and install along extra dependencies
+that you might find useful: `pip install -e ."[extras]"`. See
+`[project.optional-dependencies]` in the pyproject.toml file to see options for
+`extras`.
+
+<br>
 
 ### User guide
 
