@@ -39,7 +39,7 @@ by their song?
   ```
 - Install pykanto:
 See [installing
-pykanto](https://nilomr.github.io/pykanto/contents/1_getting-started.html) for a
+pykanto](https://nilomr.github.io/pykanto/_build/html/contents/installation.html) for a
 complete installation guide for the library, or just run `pip install
 pykanto`.
 
