@@ -124,5 +124,15 @@ pykanto-slaunch --exp BigBird2020 --p short --time 01:00:00 -n 1 --memory 40000 
 
 </details>
 
+<br>
+
+### Citation
+If you use `pykanto` in your own work, please cite the associated article and/or
+the repository:
+
+[![DOI](https://sandbox.zenodo.org/badge/239354937.svg)](https://sandbox.zenodo.org/badge/latestdoi/239354937)
+![DOI](https://img.shields.io/badge/DOI-coming%20soon-yellow)
+
+#
 <sub>© Nilo M. Recalde, 2021-present</sub>
 
