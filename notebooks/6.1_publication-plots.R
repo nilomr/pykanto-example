@@ -1,6 +1,6 @@
 box::use(
   ggplot2[...], dplyr, readr[read_csv], ggdist[stat_dots], here, beeswarm,
-  shades, patchwork[...]
+  shades, patchwork[...], svglite
 )
 
 # DATA INGEST ──────────────────────────────────────────────────────────────── #
