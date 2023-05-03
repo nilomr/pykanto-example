@@ -4,15 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 import git
-
 import pandas as pd
-
 from pykanto.utils.io import load_dataset, save_subset
 from pykanto.utils.paths import ProjDirs
 from sklearn.model_selection import train_test_split
-
 
 # ──── SETTINGS ─────────────────────────────────────────────────────────────────
 
