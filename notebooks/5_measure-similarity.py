@@ -1,32 +1,16 @@
 # ──── IMPORTS ──────────────────────────────────────────────────────────────────
 
 from collections import Counter
-from ossaudiodev import SNDCTL_DSP_GETTRIGGER
 from pathlib import Path
-from typing import List
 
 import git
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from mpl_toolkits.axes_grid1 import ImageGrid
-from PIL import Image
 from pykanto.utils.compute import with_pbar
 from pykanto.utils.io import load_dataset
 from pykanto.utils.paths import ProjDirs
-from pynndescent import NNDescent
-
-# %%
-# MDS
-from sklearn.manifold import MDS
 from sklearn.metrics import pairwise_distances
-from sklearn.neighbors import BallTree
-from tqdm import tqdm
-
-# %%
-# Umap of song type median positions
-# from cuml import UMAP as cumlUMAP
 from umap import UMAP
 
 # ──── SETTINGS ─────────────────────────────────────────────────────────────────
@@ -59,11 +43,11 @@ dataset = load_dataset(out_dir, DIRS)
 imgpaths = [i for i in train_path.glob("*/*.jpg")]
 fnames = np.unique(feat_vec.index.values)
 
-imnames=  [i.stem for i in imgpaths]
+imnames = [i.stem for i in imgpaths]
 
 # fnames not in imnames:
 
-not_in= [i for i in fnames if i not in imnames]
+not_in = [i for i in fnames if i not in imnames]
 len(not_in)
 
 labels = []
@@ -91,7 +75,7 @@ mx = 1 - sim_mat
 mx = np.round((mx - np.min(mx)) / np.ptp(mx), 5)
 
 
-#──── WRANGLE RESULTS ──────────────────────────────────────────────────────────
+# ──── WRANGLE RESULTS ──────────────────────────────────────────────────────────
 
 # Consolidate discrete sharing matrices (by year)
 birdict = bird_data.father.to_dict()
@@ -113,7 +97,7 @@ tall_mat["year2"] = tall_mat.class2.apply(lambda x: x[:4])
 tall_mat = tall_mat.query("dist != 1")
 
 
-#──── COMPARE SIMILARITY BETWEEN AND WITHIN BIRDS ──────────────────────────────
+# ──── COMPARE SIMILARITY BETWEEN AND WITHIN BIRDS ──────────────────────────────
 
 n = 1000  # Size of subset to take (for comp. eff.)
 
@@ -160,7 +144,7 @@ all_dir = DIRS.DATA / "datasets" / DATASET_ID / "distances.csv"
 all_df.to_csv(all_dir, index=False)
 
 
-#──── UMAP PROJECTION ──────────────────────────────────────────────────────────
+# ──── UMAP PROJECTION ──────────────────────────────────────────────────────────
 
 # We can project the similarity matrix to a lower dimension representation
 # using, e.g., UMAP:
