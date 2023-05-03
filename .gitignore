@@ -98,6 +98,7 @@ data/datasets/*
 !data/datasets/pykanto-example
 data/datasets/pykanto-example/*
 !data/datasets/pykanto-example/checked_labels.csv
+!data/datasets/pykanto-example/bird_data.csv
 
 !/data/datasets/pykanto-example/ML/
 /data/datasets/pykanto-example/ML/*
